@@ -1014,7 +1014,6 @@ class HealingApp {
     const gainNode = ac.createGain();
     gainNode.gain.value = 0;
     gainNode.connect(this.dryBus);
-    gainNode.connect(this.reverbSend);
 
     const nodes = [];
 
