@@ -113,74 +113,126 @@ const MOOD_LABELS = [
 
 const PRESETS = {
   meditation: [
-    // 0: 家で静かに
-    { layers: [
-      { type:'binaural', name:'バイノーラル θ波 6Hz', icon:'〜', base:200, beat:6, vol:0.52 },
-      { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.65 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
-        patterns:[
-          [130.81, 196, 164.81, 246.94],
-          [130.81, 164.81, 246.94, 196, 130.81, null],
-          [196, 246.94, 329.63, 246.94],
-          [130.81, null, 246.94, 164.81, null, 196],
-          [164.81, 196, null, 246.94, 196, 130.81],
-        ], bpm:20, startDelay:4, vol:0.50 },
-      { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:24000, vol:0.58 },
-    ]},
-    // 1: 外で騒がしい中で
-    { layers: [
-      { type:'binaural', name:'バイノーラル θ波 7Hz', icon:'〜', base:200, beat:7, vol:0.58 },
-      { type:'noise',    name:'ブラウンノイズ',        icon:'🌊', noiseType:'brown', vol:0.38 },
-      { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.60 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
-        patterns:[
-          [130.81, 196, 164.81, 246.94],
-          [196, 130.81, 246.94, 164.81],
-          [130.81, null, 196, 246.94, 196, null],
-          [164.81, 130.81, null, 196, 246.94, null],
-        ], bpm:22, startDelay:5, vol:0.45 },
-    ]},
-    // 2: 移動中に
-    { layers: [
-      { type:'binaural', name:'バイノーラル θ波 5Hz', icon:'〜', base:180, beat:5, vol:0.60 },
-      { type:'noise',    name:'ブラウンノイズ',        icon:'🌊', noiseType:'brown', vol:0.30 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
-        patterns:[
-          [130.81, 196, 164.81, 246.94],
-          [130.81, null, 164.81, null, 196, 246.94],
-          [164.81, 196, 246.94, 329.63, 246.94, 196],
-          [130.81, 196, null, 164.81, 246.94, null],
-          [196, 164.81, 130.81, null, 164.81, 196],
-        ], bpm:18, startDelay:3, vol:0.55 },
-    ]},
-    // 3: ホテルで自宅のように
-    { layers: [
-      { type:'binaural', name:'バイノーラル θ波 6Hz', icon:'〜', base:200, beat:6, vol:0.50 },
-      { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.70 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
-        patterns:[
-          [130.81, 164.81, 196, 246.94, 329.63],
-          [261.63, 196, 164.81, 130.81, null],
-          [130.81, 196, null, 246.94, null, 329.63],
-          [164.81, null, 130.81, 196, 246.94, 196],
-          [329.63, 246.94, 196, 164.81, 130.81, null],
-        ], bpm:18, startDelay:5, vol:0.52 },
-      { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:30000, vol:0.55 },
-    ]},
-    // 4: 勝負の前
-    { layers: [
-      { type:'binaural', name:'バイノーラル θ波 8Hz', icon:'〜', base:220, beat:8, vol:0.55 },
-      { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.55 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
-        patterns:[
-          [196, 246.94, 329.63, 392, 329.63],
-          [261.63, 329.63, 392, 329.63, 261.63, 196],
-          [246.94, 329.63, 246.94, 196, 164.81, null],
-          [130.81, 196, 261.63, 329.63, null, 196],
-          [196, 261.63, 329.63, 261.63, 196, null],
-        ], bpm:28, startDelay:3, vol:0.56 },
-      { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:18000, vol:0.52 },
-    ]},
+    // 0: 家で静かに — 深い静寂: θ波 + 528Hz + 弦楽パッド + ハープ + ボウル
+    {
+      breathe: [
+        { idx:0, min:0.44, max:0.58 },
+        { idx:1, min:0.46, max:0.68 },
+        { idx:2, min:0.42, max:0.65 },
+        { idx:3, min:0.28, max:0.52 },
+        { idx:4, min:0.36, max:0.60 },
+      ],
+      breatheInterval: 180,
+      layers: [
+        { type:'binaural',  name:'バイノーラル θ波 6Hz', icon:'〜', base:200, beat:6, vol:0.52 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ',    icon:'✦',  vol:0.60 },
+        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.62 },
+        { type:'harp',      name:'ハープ',                icon:'🪕',
+          patterns:[
+            [130.81, null, 196, null, 246.94],
+            [null, 164.81, null, 196, null],
+            [196, null, 246.94, null, 130.81],
+            [null, 130.81, null, 164.81, null],
+          ], bpm:20, startDelay:4, vol:0.46 },
+        { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:24000, vol:0.56 },
+      ]
+    },
+    // 1: 外で騒がしい中で — マスキング瞑想: θ波 + ブラウン + 弦楽パッド + ハープ + 528Hz
+    {
+      breathe: [
+        { idx:0, min:0.46, max:0.62 },
+        { idx:1, min:0.30, max:0.56 },
+        { idx:2, min:0.40, max:0.62 },
+        { idx:3, min:0.26, max:0.50 },
+        { idx:4, min:0.42, max:0.62 },
+      ],
+      breatheInterval: 160,
+      layers: [
+        { type:'binaural',  name:'バイノーラル θ波 7Hz', icon:'〜', base:200, beat:7, vol:0.58 },
+        { type:'noise',     name:'ブラウンノイズ',        icon:'🌫️', noiseType:'brown', vol:0.40 },
+        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.58 },
+        { type:'harp',      name:'ハープ',                icon:'🪕',
+          patterns:[
+            [130.81, 196, null, 246.94, null],
+            [null, 164.81, 196, null, 130.81],
+            [196, null, 246.94, 164.81, null],
+            [130.81, null, 196, null, 246.94],
+          ], bpm:22, startDelay:5, vol:0.42 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦', vol:0.52 },
+      ]
+    },
+    // 2: 移動中に — ポータブル瞑想: θ波 + ブラウン + ハープ + 弦楽パッド + ボウル
+    {
+      breathe: [
+        { idx:0, min:0.48, max:0.64 },
+        { idx:1, min:0.26, max:0.50 },
+        { idx:2, min:0.38, max:0.60 },
+        { idx:3, min:0.38, max:0.60 },
+        { idx:4, min:0.32, max:0.56 },
+      ],
+      breatheInterval: 150,
+      layers: [
+        { type:'binaural', name:'バイノーラル θ波 5Hz', icon:'〜', base:180, beat:5, vol:0.60 },
+        { type:'noise',    name:'ブラウンノイズ',        icon:'🌫️', noiseType:'brown', vol:0.34 },
+        { type:'harp',     name:'ハープ',                icon:'🪕',
+          patterns:[
+            [130.81, null, 196, null, null],
+            [null, 164.81, null, 246.94, null],
+            [196, null, null, 164.81, null],
+            [null, 130.81, 196, null, 164.81],
+          ], bpm:18, startDelay:3, vol:0.50 },
+        { type:'pad',  name:'弦楽器パッド',  icon:'🎻', freqs:[261.63,329.63,392], vol:0.54 },
+        { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:30000, vol:0.48 },
+      ]
+    },
+    // 3: ホテルで自宅のように — 旅の瞑想: θ波 + 528Hz + 弦楽パッド + ハープ + 波
+    {
+      breathe: [
+        { idx:0, min:0.40, max:0.56 },
+        { idx:1, min:0.50, max:0.72 },
+        { idx:2, min:0.52, max:0.74 },
+        { idx:3, min:0.30, max:0.54 },
+        { idx:4, min:0.18, max:0.40 },
+      ],
+      breatheInterval: 200,
+      layers: [
+        { type:'binaural',  name:'バイノーラル θ波 6Hz', icon:'〜', base:200, beat:6, vol:0.50 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ',    icon:'✦',  vol:0.64 },
+        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.68 },
+        { type:'harp',      name:'ハープ',                icon:'🪕',
+          patterns:[
+            [130.81, 164.81, 196, null, 246.94],
+            [261.63, null, 196, 164.81, null],
+            [130.81, null, 246.94, null, 196],
+            [164.81, 196, null, 246.94, null],
+          ], bpm:18, startDelay:5, vol:0.48 },
+        { type:'ocean', name:'波の音', icon:'🌊', vol:0.30 },
+      ]
+    },
+    // 4: 勝負の前 — 集中瞑想: θ高め + 弦楽パッド + ハープ + ボウル + 528Hz
+    {
+      breathe: [
+        { idx:0, min:0.44, max:0.62 },
+        { idx:1, min:0.44, max:0.64 },
+        { idx:2, min:0.36, max:0.58 },
+        { idx:3, min:0.34, max:0.56 },
+        { idx:4, min:0.46, max:0.66 },
+      ],
+      breatheInterval: 165,
+      layers: [
+        { type:'binaural',  name:'バイノーラル θ波 8Hz', icon:'〜', base:220, beat:8, vol:0.55 },
+        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.56 },
+        { type:'harp',      name:'ハープ',                icon:'🪕',
+          patterns:[
+            [196, 246.94, 329.63, null, 392],
+            [261.63, 329.63, null, 392, 329.63],
+            [246.94, null, 329.63, 261.63, null],
+            [196, 261.63, null, 329.63, null],
+          ], bpm:26, startDelay:3, vol:0.50 },
+        { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:18000, vol:0.50 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.58 },
+      ]
+    },
   ],
 
   sleep: [
@@ -297,73 +349,126 @@ const PRESETS = {
   ],
 
   focus: [
-    // 0: 家で静かに
-    { layers: [
-      { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.50 },
-      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.35 },
-      { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.62 },
-      { type:'harp',     name:'ハープ',                 icon:'🪕',
-        patterns:[
-          [146.83, 220, 185, 293.66],
-          [185, 220, 293.66, 369.99, 293.66],
-          [146.83, 185, 220, null, 185, 293.66],
-          [293.66, 220, 185, 146.83, null, 220],
-          [220, 293.66, 369.99, 293.66, 220, 185],
-        ], bpm:35, startDelay:3, vol:0.48 },
-    ]},
-    // 1: 外で騒がしい中で
-    { layers: [
-      { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.55 },
-      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.52 },
-      { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.55 },
-      { type:'harp',     name:'ハープ',                 icon:'🪕',
-        patterns:[
-          [146.83, 220, 185, 293.66],
-          [185, 146.83, 220, null, 293.66],
-          [293.66, 220, 185, 146.83, 220, null],
-          [220, 185, null, 293.66, 220, null],
-        ], bpm:35, startDelay:4, vol:0.42 },
-    ]},
-    // 2: 移動中に
-    { layers: [
-      { type:'binaural', name:'バイノーラル α波 12Hz', icon:'〜', base:200, beat:12, vol:0.58 },
-      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.48 },
-      { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.55 },
-      { type:'harp',     name:'ハープ',                 icon:'🪕',
-        patterns:[
-          [146.83, 220, 185, 293.66],
-          [220, 185, null, 293.66, null, 220],
-          [185, 220, 293.66, 220, null, 185],
-          [146.83, null, 220, 185, null, 293.66],
-        ], bpm:30, startDelay:4, vol:0.40 },
-    ]},
-    // 3: ホテルで自宅のように
-    { layers: [
-      { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.50 },
-      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.28 },
-      { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.65 },
-      { type:'harp',     name:'ハープ',                 icon:'🪕',
-        patterns:[
-          [146.83, 220, 185, 293.66, 369.99],
-          [185, 220, 293.66, 220, 185, 146.83],
-          [146.83, null, 220, 293.66, null, 369.99],
-          [293.66, 220, 185, null, 220, 293.66],
-          [369.99, 293.66, 220, 185, null, 220],
-        ], bpm:30, startDelay:4, vol:0.50 },
-    ]},
-    // 4: 勝負の前
-    { layers: [
-      { type:'binaural', name:'バイノーラル α波 14Hz', icon:'〜', base:220, beat:14, vol:0.55 },
-      { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.58 },
-      { type:'harp',     name:'ハープ',                 icon:'🪕',
-        patterns:[
-          [220, 293.66, 369.99, 440, 369.99],
-          [293.66, 369.99, 440, 369.99, 293.66, 220],
-          [185, 220, 293.66, 369.99, null, 293.66],
-          [440, 369.99, 293.66, 220, null, 293.66],
-          [220, 369.99, 440, null, 369.99, 293.66],
-        ], bpm:42, startDelay:2, vol:0.58 },
-    ]},
+    // 0: 家で静かに — フロー状態: α波 + ピンク + 弦楽パッド + ハープ + 川の流れ
+    {
+      breathe: [
+        { idx:0, min:0.42, max:0.58 },
+        { idx:1, min:0.22, max:0.48 },
+        { idx:2, min:0.44, max:0.66 },
+        { idx:3, min:0.30, max:0.54 },
+        { idx:4, min:0.16, max:0.38 },
+      ],
+      breatheInterval: 140,
+      layers: [
+        { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.50 },
+        { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.32 },
+        { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.60 },
+        { type:'harp',     name:'ハープ',                 icon:'🪕',
+          patterns:[
+            [146.83, 220, null, 293.66, null],
+            [185, null, 220, null, 369.99],
+            [293.66, 220, null, 185, 220],
+            [null, 146.83, 220, null, 293.66],
+          ], bpm:35, startDelay:3, vol:0.46 },
+        { type:'stream', name:'川の流れ', icon:'💧', vol:0.28 },
+      ]
+    },
+    // 1: 外で騒がしい中で — マスキング集中: α波 + ピンク + ブラウン + 弦楽パッド + ハープ
+    {
+      breathe: [
+        { idx:0, min:0.46, max:0.62 },
+        { idx:1, min:0.38, max:0.62 },
+        { idx:2, min:0.28, max:0.52 },
+        { idx:3, min:0.38, max:0.60 },
+        { idx:4, min:0.26, max:0.48 },
+      ],
+      breatheInterval: 120,
+      layers: [
+        { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.55 },
+        { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.48 },
+        { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.35 },
+        { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.54 },
+        { type:'harp',     name:'ハープ',                 icon:'🪕',
+          patterns:[
+            [146.83, null, 220, null, 293.66],
+            [null, 185, null, 220, null],
+            [220, null, 293.66, null, 185],
+            [null, 146.83, null, 220, null],
+          ], bpm:35, startDelay:4, vol:0.40 },
+      ]
+    },
+    // 2: 移動中に — コンパクト集中: α高め + ピンク + ブラウン + 弦楽パッド + ハープ
+    {
+      breathe: [
+        { idx:0, min:0.48, max:0.65 },
+        { idx:1, min:0.36, max:0.60 },
+        { idx:2, min:0.26, max:0.50 },
+        { idx:3, min:0.40, max:0.62 },
+        { idx:4, min:0.24, max:0.46 },
+      ],
+      breatheInterval: 110,
+      layers: [
+        { type:'binaural', name:'バイノーラル α波 12Hz', icon:'〜', base:200, beat:12, vol:0.58 },
+        { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.46 },
+        { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.30 },
+        { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.54 },
+        { type:'harp',     name:'ハープ',                 icon:'🪕',
+          patterns:[
+            [146.83, 220, null, 293.66, null],
+            [220, null, 293.66, null, 185],
+            [null, 185, 220, null, 293.66],
+            [293.66, null, 220, 146.83, null],
+          ], bpm:30, startDelay:4, vol:0.38 },
+      ]
+    },
+    // 3: ホテルで自宅のように — 深いフロー: α波 + ピンク + 弦楽パッド + ハープ + 川の流れ
+    {
+      breathe: [
+        { idx:0, min:0.42, max:0.58 },
+        { idx:1, min:0.20, max:0.42 },
+        { idx:2, min:0.48, max:0.70 },
+        { idx:3, min:0.32, max:0.56 },
+        { idx:4, min:0.18, max:0.40 },
+      ],
+      breatheInterval: 150,
+      layers: [
+        { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.50 },
+        { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.26 },
+        { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.64 },
+        { type:'harp',     name:'ハープ',                 icon:'🪕',
+          patterns:[
+            [146.83, 220, 185, null, 293.66],
+            [185, 220, null, 369.99, 293.66],
+            [293.66, null, 220, 185, null],
+            [null, 146.83, 220, null, 369.99],
+          ], bpm:30, startDelay:4, vol:0.48 },
+        { type:'stream', name:'川の流れ', icon:'💧', vol:0.26 },
+      ]
+    },
+    // 4: 勝負の前 — ピークフォーカス: α→β + 弦楽パッド + ハープ + ピンク + ボウル
+    {
+      breathe: [
+        { idx:0, min:0.46, max:0.64 },
+        { idx:1, min:0.46, max:0.66 },
+        { idx:2, min:0.38, max:0.60 },
+        { idx:3, min:0.26, max:0.48 },
+        { idx:4, min:0.30, max:0.54 },
+      ],
+      breatheInterval: 130,
+      layers: [
+        { type:'binaural', name:'バイノーラル α波 14Hz', icon:'〜', base:220, beat:14, vol:0.55 },
+        { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.58 },
+        { type:'harp',     name:'ハープ',                 icon:'🪕',
+          patterns:[
+            [220, 293.66, 369.99, null, 440],
+            [293.66, 369.99, null, 440, 369.99],
+            [185, 220, 293.66, null, 369.99],
+            [440, null, 369.99, 293.66, null],
+          ], bpm:42, startDelay:2, vol:0.54 },
+        { type:'noise', name:'ピンクノイズ', icon:'🌫️', noiseType:'pink', vol:0.32 },
+        { type:'bowl',  name:'チベタンボウル', icon:'🔔', interval:20000, vol:0.48 },
+      ]
+    },
   ],
 };
 
@@ -375,162 +480,252 @@ const TIMER_OPTIONS = {
   ready:      [{l:'なし',m:0},{l:'10分',m:10},{l:'20分',m:20},{l:'30分',m:30}],
 };
 
-// A major notes (bright, uplifting): A3=220 C#4=277.18 E4=329.63 A4=440 C#5=554.37 E5=659.25
+// A major (bright, uplifting): A3=220 C#4=277.18 E4=329.63 A4=440 C#5=554.37 E5=659.25
 PRESETS.morning = [
-  // 0: 家で静かに
-  { breathe:[{idx:0,min:0.36,max:0.56},{idx:1,min:0.40,max:0.62},{idx:2,min:0.30,max:0.54},{idx:3,min:0.18,max:0.45}],
-    breatheInterval:150,
-    layers:[
+  // 0: 家で静かに — やさしい目覚め: α→β + 弦楽パッド + ハープ + 小鳥 + 川の流れ
+  {
+    breathe: [
+      { idx:0, min:0.40, max:0.56 },
+      { idx:1, min:0.38, max:0.60 },
+      { idx:2, min:0.36, max:0.58 },
+      { idx:3, min:0.22, max:0.48 },
+      { idx:4, min:0.18, max:0.40 },
+    ],
+    breatheInterval: 150,
+    layers: [
       { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.48 },
       { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,277.18,329.63,440], vol:0.55 },
-      { type:'harp',     name:'ハープ',           icon:'🪕',
+      { type:'harp',     name:'ハープ',            icon:'🪕',
         patterns:[
-          [220, 277.18, 329.63, 440],
-          [220, 329.63, null, 440, null, 554.37],
-          [277.18, 329.63, 440, 329.63, null, 440],
-          [220, null, 277.18, 329.63, null, 440],
-          [329.63, 440, 554.37, 440, 329.63, null],
-        ], bpm:18, startDelay:4, vol:0.50 },
-      { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.42 },
-  ]},
-  // 1: 外で騒がしい中で
-  { breathe:[{idx:0,min:0.42,max:0.60},{idx:1,min:0.35,max:0.55},{idx:2,min:0.30,max:0.52},{idx:3,min:0.15,max:0.38}],
-    breatheInterval:130,
-    layers:[
-      { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.52 },
-      { type:'noise',    name:'ピンクノイズ',      icon:'🌫️', noiseType:'pink', vol:0.28 },
-      { type:'harp',     name:'ハープ',           icon:'🪕',
-        patterns:[
-          [220, 277.18, 329.63, 440],
-          [329.63, 440, 554.37, 440],
-          [220, null, 329.63, null, 440, 554.37],
-          [277.18, 329.63, null, 440, null, 329.63],
+          [220, 277.18, null, 329.63, null],
+          [null, 329.63, 440, null, 554.37],
+          [277.18, null, 329.63, null, 440],
+          [220, null, 277.18, 329.63, null],
         ], bpm:20, startDelay:4, vol:0.48 },
-      { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.32 },
-  ]},
-  // 2: 移動中に
-  { breathe:[{idx:0,min:0.44,max:0.62},{idx:1,min:0.32,max:0.52},{idx:2,min:0.28,max:0.50}],
-    breatheInterval:120,
-    layers:[
+      { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.40 },
+      { type:'stream', name:'川の流れ',       icon:'💧', vol:0.24 },
+    ]
+  },
+  // 1: 外で騒がしい中で — ノイズマスク覚醒: α→β + ピンク + ハープ + 小鳥 + 弦楽パッド
+  {
+    breathe: [
+      { idx:0, min:0.44, max:0.60 },
+      { idx:1, min:0.30, max:0.54 },
+      { idx:2, min:0.28, max:0.52 },
+      { idx:3, min:0.18, max:0.40 },
+      { idx:4, min:0.34, max:0.56 },
+    ],
+    breatheInterval: 130,
+    layers: [
+      { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.52 },
+      { type:'noise',    name:'ピンクノイズ',      icon:'🌫️', noiseType:'pink', vol:0.38 },
+      { type:'harp',     name:'ハープ',            icon:'🪕',
+        patterns:[
+          [220, null, 329.63, null, 440],
+          [277.18, 329.63, null, 440, null],
+          [null, 220, 277.18, null, 329.63],
+          [329.63, null, 440, 329.63, null],
+        ], bpm:22, startDelay:4, vol:0.46 },
+      { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.30 },
+      { type:'pad',   name:'弦楽器パッド',   icon:'🎻', freqs:[220,277.18,329.63,440], vol:0.48 },
+    ]
+  },
+  // 2: 移動中に — モバイル覚醒: α→β + ピンク + ハープ + 弦楽パッド + 川の流れ
+  {
+    breathe: [
+      { idx:0, min:0.46, max:0.62 },
+      { idx:1, min:0.28, max:0.52 },
+      { idx:2, min:0.26, max:0.50 },
+      { idx:3, min:0.36, max:0.58 },
+      { idx:4, min:0.16, max:0.36 },
+    ],
+    breatheInterval: 120,
+    layers: [
       { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.55 },
-      { type:'noise',    name:'ピンクノイズ',      icon:'🌫️', noiseType:'pink', vol:0.30 },
-      { type:'harp',     name:'ハープ',           icon:'🪕',
+      { type:'noise',    name:'ピンクノイズ',      icon:'🌫️', noiseType:'pink', vol:0.36 },
+      { type:'harp',     name:'ハープ',            icon:'🪕',
         patterns:[
-          [220, 277.18, 329.63, 440],
-          [220, 329.63, 440, 329.63, null, 220],
-          [277.18, null, 329.63, 440, null, 554.37],
-          [329.63, 220, null, 277.18, 329.63, null],
-        ], bpm:22, startDelay:3, vol:0.50 },
-  ]},
-  // 3: ホテルで自宅のように
-  { breathe:[{idx:0,min:0.36,max:0.55},{idx:1,min:0.42,max:0.65},{idx:2,min:0.32,max:0.56},{idx:3,min:0.20,max:0.46}],
-    breatheInterval:160,
-    layers:[
+          [220, 329.63, null, 440, null],
+          [277.18, null, 329.63, null, 554.37],
+          [220, null, 277.18, 329.63, null],
+          [329.63, 440, null, 329.63, null],
+        ], bpm:22, startDelay:3, vol:0.48 },
+      { type:'pad',    name:'弦楽器パッド', icon:'🎻', freqs:[220,277.18,329.63,440], vol:0.52 },
+      { type:'stream', name:'川の流れ',     icon:'💧', vol:0.20 },
+    ]
+  },
+  // 3: ホテルで自宅のように — 旅の目覚め: α→β + 弦楽パッド + ハープ + 小鳥 + 風の音
+  {
+    breathe: [
+      { idx:0, min:0.38, max:0.54 },
+      { idx:1, min:0.42, max:0.64 },
+      { idx:2, min:0.34, max:0.56 },
+      { idx:3, min:0.24, max:0.48 },
+      { idx:4, min:0.16, max:0.36 },
+    ],
+    breatheInterval: 160,
+    layers: [
       { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.48 },
-      { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,277.18,329.63,440,554.37], vol:0.60 },
-      { type:'harp',     name:'ハープ',           icon:'🪕',
+      { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,277.18,329.63,440,554.37], vol:0.58 },
+      { type:'harp',     name:'ハープ',            icon:'🪕',
         patterns:[
-          [220, 277.18, 329.63, 440, 554.37],
-          [329.63, 440, 554.37, 440, 329.63, null],
-          [220, null, 277.18, 329.63, 440, null],
-          [440, 329.63, 277.18, 220, null, 277.18],
-          [220, 329.63, null, 440, 554.37, null],
-        ], bpm:18, startDelay:5, vol:0.52 },
-      { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.38 },
-  ]},
-  // 4: これから勝負の準備
-  { breathe:[{idx:0,min:0.42,max:0.62},{idx:1,min:0.45,max:0.65},{idx:2,min:0.38,max:0.60}],
-    breatheInterval:110,
-    layers:[
+          [220, 277.18, 329.63, null, 440],
+          [329.63, 440, null, 554.37, 440],
+          [220, null, 329.63, 440, null],
+          [277.18, 329.63, null, 440, null],
+        ], bpm:18, startDelay:5, vol:0.50 },
+      { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.36 },
+      { type:'wind',  name:'風の音',         icon:'🍃', vol:0.18 },
+    ]
+  },
+  // 4: これから勝負の準備 — 戦略的覚醒: α→β速め + 弦楽パッド + ハープ + 小鳥 + 川の流れ
+  {
+    breathe: [
+      { idx:0, min:0.44, max:0.62 },
+      { idx:1, min:0.46, max:0.66 },
+      { idx:2, min:0.40, max:0.62 },
+      { idx:3, min:0.26, max:0.50 },
+      { idx:4, min:0.18, max:0.38 },
+    ],
+    breatheInterval: 110,
+    layers: [
       { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:210, beat:10, driftTo:16, driftDuration:900, vol:0.52 },
       { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,329.63,440,554.37], vol:0.58 },
-      { type:'harp',     name:'ハープ',           icon:'🪕',
+      { type:'harp',     name:'ハープ',            icon:'🪕',
         patterns:[
-          [220, 329.63, 440, 554.37, 659.25],
-          [329.63, 440, 554.37, 659.25, 554.37, 440],
-          [220, 277.18, 329.63, 440, 554.37, null],
-          [440, 554.37, 659.25, 554.37, null, 440],
-          [220, null, 329.63, 440, null, 554.37],
-        ], bpm:26, startDelay:3, vol:0.56 },
-  ]},
+          [220, 329.63, 440, null, 554.37],
+          [329.63, 440, 554.37, null, 659.25],
+          [220, 277.18, 329.63, 440, null],
+          [440, 554.37, null, 659.25, null],
+        ], bpm:26, startDelay:3, vol:0.54 },
+      { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.38 },
+      { type:'stream', name:'川の流れ',       icon:'💧', vol:0.22 },
+    ]
+  },
 ];
 
-// D major notes (energetic): D4=293.66 F#4=369.99 A4=440 D5=587.33 F#5=739.99 A5=880
+// D major (energetic): D4=293.66 F#4=369.99 A4=440 D5=587.33 F#5=739.99 A5=880
 PRESETS.ready = [
-  // 0: 家で静かに
-  { breathe:[{idx:0,min:0.42,max:0.60},{idx:1,min:0.45,max:0.68},{idx:2,min:0.38,max:0.60}],
-    breatheInterval:120,
-    layers:[
+  // 0: 家で静かに — 朝の活力: β波 + 弦楽パッド + ハープ + ピンク + 小鳥
+  {
+    breathe: [
+      { idx:0, min:0.44, max:0.60 },
+      { idx:1, min:0.46, max:0.66 },
+      { idx:2, min:0.40, max:0.62 },
+      { idx:3, min:0.24, max:0.46 },
+      { idx:4, min:0.20, max:0.44 },
+    ],
+    breatheInterval: 120,
+    layers: [
       { type:'binaural', name:'バイノーラル β波 18Hz', icon:'〜', base:220, beat:18, vol:0.50 },
       { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.58 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
+      { type:'harp',     name:'ハープ',                 icon:'🪕',
         patterns:[
-          [293.66, 369.99, 440, 587.33],
-          [440, 587.33, 369.99, 440, 293.66, 369.99],
-          [293.66, 440, 369.99, 587.33, 440, null],
-          [369.99, 440, 587.33, 440, 369.99, 293.66],
-          [587.33, 440, 369.99, 293.66, 369.99, 440],
+          [293.66, 369.99, 440, null, 587.33],
+          [440, 587.33, null, 440, 369.99],
+          [293.66, null, 440, 587.33, null],
+          [369.99, 440, null, 587.33, 440],
         ], bpm:58, startDelay:3, vol:0.52 },
-  ]},
-  // 1: 外で騒がしい中で
-  { breathe:[{idx:0,min:0.46,max:0.64},{idx:1,min:0.42,max:0.62},{idx:2,min:0.38,max:0.58}],
-    breatheInterval:100,
-    layers:[
+      { type:'noise',  name:'ピンクノイズ',   icon:'🌫️', noiseType:'pink', vol:0.28 },
+      { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.36 },
+    ]
+  },
+  // 1: 外で騒がしい中で — マスキング活力: β波 + ピンク + ハープ + 弦楽パッド + 川の流れ
+  {
+    breathe: [
+      { idx:0, min:0.48, max:0.64 },
+      { idx:1, min:0.38, max:0.60 },
+      { idx:2, min:0.36, max:0.58 },
+      { idx:3, min:0.40, max:0.62 },
+      { idx:4, min:0.18, max:0.38 },
+    ],
+    breatheInterval: 100,
+    layers: [
       { type:'binaural', name:'バイノーラル β波 18Hz', icon:'〜', base:220, beat:18, vol:0.55 },
-      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.45 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
+      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.46 },
+      { type:'harp',     name:'ハープ',                 icon:'🪕',
         patterns:[
-          [293.66, 369.99, 440, 587.33],
-          [440, 587.33, 440, 369.99, 293.66, null],
-          [293.66, 440, 587.33, 440, null, 293.66],
-          [369.99, 440, 369.99, 587.33, null, 440],
+          [293.66, 440, null, 587.33, null],
+          [369.99, null, 440, 587.33, 440],
+          [293.66, 369.99, null, 440, null],
+          [440, 587.33, 440, null, 369.99],
         ], bpm:60, startDelay:3, vol:0.50 },
-  ]},
-  // 2: 移動中に
-  { breathe:[{idx:0,min:0.48,max:0.66},{idx:1,min:0.40,max:0.60},{idx:2,min:0.36,max:0.56}],
-    breatheInterval:90,
-    layers:[
+      { type:'pad',    name:'弦楽器パッド', icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.52 },
+      { type:'stream', name:'川の流れ',     icon:'💧', vol:0.22 },
+    ]
+  },
+  // 2: 移動中に — モバイル活力: β高め + ピンク + ブラウン + ハープ + 弦楽パッド
+  {
+    breathe: [
+      { idx:0, min:0.50, max:0.66 },
+      { idx:1, min:0.36, max:0.58 },
+      { idx:2, min:0.24, max:0.46 },
+      { idx:3, min:0.36, max:0.58 },
+      { idx:4, min:0.36, max:0.58 },
+    ],
+    breatheInterval: 90,
+    layers: [
       { type:'binaural', name:'バイノーラル β波 20Hz', icon:'〜', base:220, beat:20, vol:0.58 },
-      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.42 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
+      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.44 },
+      { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.30 },
+      { type:'harp',     name:'ハープ',                 icon:'🪕',
         patterns:[
-          [293.66, 369.99, 440, 587.33],
-          [440, 293.66, 369.99, 440, 587.33, null],
-          [293.66, 440, null, 587.33, 440, null],
-          [369.99, 587.33, 440, 293.66, null, 369.99],
+          [293.66, 440, 587.33, null, 440],
+          [369.99, null, 440, 587.33, null],
+          [293.66, 369.99, null, 587.33, null],
+          [440, 587.33, null, 440, 369.99],
         ], bpm:62, startDelay:2, vol:0.52 },
-  ]},
-  // 3: ホテルで自宅のように
-  { breathe:[{idx:0,min:0.42,max:0.60},{idx:1,min:0.48,max:0.70},{idx:2,min:0.20,max:0.42},{idx:3,min:0.38,max:0.60}],
-    breatheInterval:115,
-    layers:[
+      { type:'pad', name:'弦楽器パッド', icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.52 },
+    ]
+  },
+  // 3: ホテルで自宅のように — 旅の活力: β波 + 弦楽パッド + ハープ + ピンク + 風の音
+  {
+    breathe: [
+      { idx:0, min:0.44, max:0.60 },
+      { idx:1, min:0.50, max:0.70 },
+      { idx:2, min:0.40, max:0.62 },
+      { idx:3, min:0.22, max:0.44 },
+      { idx:4, min:0.16, max:0.34 },
+    ],
+    breatheInterval: 115,
+    layers: [
       { type:'binaural', name:'バイノーラル β波 18Hz', icon:'〜', base:220, beat:18, vol:0.50 },
       { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440,587.33,739.99], vol:0.62 },
-      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.22 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
+      { type:'harp',     name:'ハープ',                 icon:'🪕',
         patterns:[
-          [440, 587.33, 739.99, 587.33, 440, null],
-          [293.66, 369.99, 440, 587.33, 739.99],
-          [587.33, 440, 369.99, 293.66, 369.99, null],
-          [440, 739.99, 587.33, 440, null, 369.99],
-          [293.66, 440, 587.33, null, 739.99, null],
+          [440, 587.33, null, 739.99, 587.33],
+          [293.66, 369.99, 440, null, 587.33],
+          [587.33, null, 440, 369.99, null],
+          [440, 739.99, null, 587.33, null],
         ], bpm:55, startDelay:3, vol:0.54 },
-  ]},
-  // 4: これから勝負の準備
-  { breathe:[{idx:0,min:0.48,max:0.68},{idx:1,min:0.50,max:0.72},{idx:2,min:0.42,max:0.65}],
-    breatheInterval:85,
-    layers:[
+      { type:'noise', name:'ピンクノイズ', icon:'🌫️', noiseType:'pink', vol:0.26 },
+      { type:'wind',  name:'風の音',       icon:'🍃', vol:0.20 },
+    ]
+  },
+  // 4: これから勝負の準備 — ピーク活性: β高め + 弦楽パッド + ハープ + ピンク + 焚き火
+  {
+    breathe: [
+      { idx:0, min:0.48, max:0.66 },
+      { idx:1, min:0.52, max:0.72 },
+      { idx:2, min:0.44, max:0.66 },
+      { idx:3, min:0.26, max:0.48 },
+      { idx:4, min:0.30, max:0.54 },
+    ],
+    breatheInterval: 85,
+    layers: [
       { type:'binaural', name:'バイノーラル β波 22Hz', icon:'〜', base:220, beat:22, vol:0.55 },
       { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,440,587.33,739.99], vol:0.62 },
-      { type:'harp',     name:'ハープ',                icon:'🪕',
+      { type:'harp',     name:'ハープ',                 icon:'🪕',
         patterns:[
-          [293.66, 440, 587.33, 739.99, 880],
-          [440, 587.33, 739.99, 880, 739.99, 587.33],
-          [293.66, 369.99, 440, 587.33, 739.99, null],
-          [587.33, 739.99, 880, 739.99, null, 587.33],
-          [440, 587.33, null, 739.99, 880, null],
+          [293.66, 440, 587.33, 739.99, null],
+          [440, 587.33, 739.99, null, 880],
+          [293.66, 369.99, 440, 587.33, null],
+          [587.33, 739.99, null, 880, 739.99],
         ], bpm:70, startDelay:2, vol:0.60 },
-  ]},
+      { type:'noise', name:'ピンクノイズ', icon:'🌫️', noiseType:'pink', vol:0.30 },
+      { type:'fire',  name:'焚き火',       icon:'🔥', vol:0.36 },
+    ]
+  },
 ];
 
 // ─── Main App ───────────────────────────────────────────────────────────────
@@ -1279,8 +1474,11 @@ class HealingApp {
         const layer = this.layers[idx];
         if (!layer) return;
         const target  = min + Math.random() * (max - min);
-        const fadeSec = 22 + Math.random() * 52;  // 22–74 s crossfade
-        layer.gainNode.gain.linearRampToValueAtTime(target, this.ac.currentTime + fadeSec);
+        const fadeSec = 22 + Math.random() * 52;
+        const now = this.ac.currentTime;
+        layer.gainNode.gain.cancelScheduledValues(now);
+        layer.gainNode.gain.setValueAtTime(layer.gainNode.gain.value, now);
+        layer.gainNode.gain.linearRampToValueAtTime(target, now + fadeSec);
       });
       const next = baseIntervalSec * (0.6 + Math.random() * 0.8);
       this.schedulerTmrs.push(setTimeout(step, next * 1000));
@@ -1405,7 +1603,9 @@ class HealingApp {
       `;
       row.querySelector('.layer-slider').addEventListener('input', e => {
         const l = this.layers[+e.target.dataset.idx];
-        if (l) l.gainNode.gain.setTargetAtTime(+e.target.value / 100, this.ac.currentTime, 0.1);
+        if (!l) return;
+        l.gainNode.gain.cancelScheduledValues(this.ac.currentTime);
+        l.gainNode.gain.setTargetAtTime(+e.target.value / 100, this.ac.currentTime, 0.1);
       });
       row.querySelector('.layer-toggle').addEventListener('click', e => {
         const btn = e.currentTarget;
