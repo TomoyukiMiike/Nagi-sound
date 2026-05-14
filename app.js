@@ -184,130 +184,114 @@ const PRESETS = {
   ],
 
   sleep: [
-    // 0: 家で静かに — binaural θ→δ + solfeggio + pad + harp + ocean + wind
+    // 0: 家で静かに — 焚き火テーマ: fire + solfeggio + pad + harp
     {
       breathe: [
         { idx:0, min:0.36, max:0.54 },
-        { idx:1, min:0.44, max:0.66 },
-        { idx:2, min:0.38, max:0.60 },
-        { idx:3, min:0.24, max:0.48 },
-        { idx:4, min:0.18, max:0.40 },
-        { idx:5, min:0.16, max:0.35 },
+        { idx:1, min:0.44, max:0.64 },
+        { idx:2, min:0.38, max:0.58 },
+        { idx:3, min:0.32, max:0.55 },
+        { idx:4, min:0.22, max:0.46 },
       ],
       breatheInterval: 210,
       layers: [
         { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.50 },
-        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.60 },
-        { type:'pad',       name:'弦楽器パッド',      icon:'🎻', freqs:[264,330,396], vol:0.58 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.58 },
+        { type:'pad',       name:'弦楽器パッド',      icon:'🎻', freqs:[264,330,396], vol:0.56 },
+        { type:'fire',      name:'焚き火',            icon:'🔥', vol:0.48 },
         { type:'harp',      name:'ハープ',            icon:'🪕',
           patterns:[
-            [132, 176, 264, null, null],
+            [132, null, 176, null, null],
             [null, 198, null, 132, null],
-            [176, null, 264, null, 198],
-            [132, null, null, 176, null],
-          ], bpm:15, startDelay:6, vol:0.44 },
-        { type:'ocean',  name:'波の音', icon:'🌊', vol:0.36 },
-        { type:'wind',   name:'風の音', icon:'🍃', vol:0.22 },
+            [176, null, null, 264, null],
+            [132, null, 198, null, null],
+          ], bpm:15, startDelay:7, vol:0.40 },
       ]
     },
-    // 1: 外で騒がしい中で — binaural θ→δ + brown + rain + stream + harp
+    // 1: 外で騒がしい中で — 雨の夜テーマ: rain + stream + brown noise
     {
       breathe: [
         { idx:0, min:0.44, max:0.62 },
         { idx:1, min:0.50, max:0.72 },
-        { idx:2, min:0.42, max:0.66 },
-        { idx:3, min:0.30, max:0.52 },
+        { idx:2, min:0.42, max:0.65 },
+        { idx:3, min:0.28, max:0.50 },
         { idx:4, min:0.20, max:0.44 },
       ],
       breatheInterval: 165,
       layers: [
         { type:'binaural', name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:6, driftTo:2, driftDuration:2400, vol:0.55 },
-        { type:'noise',    name:'ブラウンノイズ',     icon:'🌫️', noiseType:'brown', vol:0.58 },
-        { type:'rain',     name:'雨音',              icon:'🌧️', vol:0.52 },
-        { type:'stream',   name:'川の流れ',           icon:'💧', vol:0.36 },
+        { type:'rain',     name:'雨音',              icon:'🌧️', vol:0.55 },
+        { type:'stream',   name:'川の流れ',           icon:'💧', vol:0.40 },
+        { type:'noise',    name:'ブラウンノイズ',     icon:'🌫️', noiseType:'brown', vol:0.38 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
-          patterns:[
-            [132, null, 176, null, null],
-            [null, 198, null, null, 132],
-            [176, null, null, 264, null],
-            [null, null, 132, null, 198],
-          ], bpm:15, startDelay:9, vol:0.36 },
-      ]
-    },
-    // 2: 移動中に — binaural θ→δ + rain + brown + solfeggio + harp (minimal)
-    {
-      breathe: [
-        { idx:0, min:0.48, max:0.65 },
-        { idx:1, min:0.38, max:0.58 },
-        { idx:2, min:0.42, max:0.62 },
-        { idx:3, min:0.22, max:0.44 },
-      ],
-      breatheInterval: 145,
-      layers: [
-        { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:6, driftTo:1.5, driftDuration:3000, vol:0.58 },
-        { type:'rain',      name:'雨音',              icon:'🌧️', vol:0.52 },
-        { type:'noise',     name:'ブラウンノイズ',     icon:'🌫️', noiseType:'brown', vol:0.38 },
-        { type:'harp',      name:'ハープ',            icon:'🪕',
           patterns:[
             [132, null, null, 176, null],
             [null, null, 198, null, null],
             [176, null, 132, null, null],
             [null, 198, null, null, 176],
-          ], bpm:15, startDelay:10, vol:0.30 },
+          ], bpm:15, startDelay:10, vol:0.32 },
       ]
     },
-    // 3: ホテルで自宅のように — binaural θ→δ + solfeggio + pad + harp + ocean + wind + bowl
+    // 2: 移動中に — ミニマル雨テーマ: rain + brown noise
     {
       breathe: [
-        { idx:0, min:0.36, max:0.55 },
-        { idx:1, min:0.52, max:0.74 },
-        { idx:2, min:0.48, max:0.70 },
-        { idx:3, min:0.28, max:0.52 },
-        { idx:4, min:0.20, max:0.44 },
+        { idx:0, min:0.48, max:0.65 },
+        { idx:1, min:0.42, max:0.62 },
+        { idx:2, min:0.36, max:0.56 },
+      ],
+      breatheInterval: 145,
+      layers: [
+        { type:'binaural', name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:6, driftTo:1.5, driftDuration:3000, vol:0.58 },
+        { type:'rain',     name:'雨音',              icon:'🌧️', vol:0.54 },
+        { type:'noise',    name:'ブラウンノイズ',     icon:'🌫️', noiseType:'brown', vol:0.40 },
+      ]
+    },
+    // 3: ホテルで自宅のように — 海辺の焚き火テーマ: fire + ocean + wind + solfeggio + pad + bowl
+    {
+      breathe: [
+        { idx:0, min:0.36, max:0.54 },
+        { idx:1, min:0.50, max:0.72 },
+        { idx:2, min:0.46, max:0.68 },
+        { idx:3, min:0.38, max:0.60 },
+        { idx:4, min:0.28, max:0.50 },
         { idx:5, min:0.18, max:0.38 },
-        { idx:6, min:0.22, max:0.48 },
+        { idx:6, min:0.20, max:0.44 },
       ],
       breatheInterval: 240,
       layers: [
         { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.48 },
-        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.65 },
-        { type:'pad',       name:'弦楽器パッド',      icon:'🎻', freqs:[264,330,396,528], vol:0.64 },
-        { type:'harp',      name:'ハープ',            icon:'🪕',
-          patterns:[
-            [132, 198, null, 264, null],
-            [264, null, 176, null, 132],
-            [null, 176, 264, null, 198],
-            [132, null, 198, null, null],
-          ], bpm:15, startDelay:6, vol:0.46 },
-        { type:'ocean',  name:'波の音',      icon:'🌊', vol:0.33 },
-        { type:'wind',   name:'風の音',      icon:'🍃', vol:0.20 },
-        { type:'bowl',   name:'チベタンボウル', icon:'🔔', interval:38000, vol:0.50 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.64 },
+        { type:'pad',       name:'弦楽器パッド',      icon:'🎻', freqs:[264,330,396,528], vol:0.62 },
+        { type:'fire',      name:'焚き火',            icon:'🔥', vol:0.44 },
+        { type:'ocean',     name:'波の音',            icon:'🌊', vol:0.34 },
+        { type:'wind',      name:'風の音',            icon:'🍃', vol:0.20 },
+        { type:'bowl',      name:'チベタンボウル',    icon:'🔔', interval:38000, vol:0.48 },
       ]
     },
-    // 4: 勝負の前 — binaural α→δ + solfeggio + pad + stream + wind + harp
+    // 4: 勝負の前 — 森の川テーマ: stream + wind + pad + solfeggio + harp
     {
       breathe: [
         { idx:0, min:0.42, max:0.62 },
         { idx:1, min:0.50, max:0.70 },
         { idx:2, min:0.44, max:0.64 },
-        { idx:3, min:0.26, max:0.50 },
-        { idx:4, min:0.22, max:0.44 },
-        { idx:5, min:0.24, max:0.48 },
+        { idx:3, min:0.28, max:0.52 },
+        { idx:4, min:0.24, max:0.46 },
+        { idx:5, min:0.26, max:0.50 },
       ],
       breatheInterval: 190,
       layers: [
         { type:'binaural',  name:'バイノーラル α→δ',  icon:'〜', base:264, beat:9, driftTo:2, driftDuration:2400, vol:0.52 },
-        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.62 },
-        { type:'pad',       name:'弦楽器パッド',      icon:'🎻', freqs:[264,330,396], vol:0.55 },
-        { type:'stream',    name:'川の流れ',           icon:'💧', vol:0.34 },
-        { type:'wind',      name:'風の音',             icon:'🍃', vol:0.26 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.60 },
+        { type:'pad',       name:'弦楽器パッド',      icon:'🎻', freqs:[264,330,396], vol:0.54 },
+        { type:'stream',    name:'川の流れ',           icon:'💧', vol:0.38 },
+        { type:'wind',      name:'風の音',             icon:'🍃', vol:0.28 },
         { type:'harp',      name:'ハープ',            icon:'🪕',
           patterns:[
-            [132, null, 198, null, 264],
-            [null, 176, null, 132, null],
-            [264, null, null, 198, null],
-            [null, 132, null, null, 176],
-          ], bpm:15, startDelay:7, vol:0.42 },
+            [132, null, 198, null, null],
+            [null, 176, null, null, 132],
+            [264, null, null, 176, null],
+            [null, 132, null, 198, null],
+          ], bpm:15, startDelay:8, vol:0.38 },
       ]
     },
   ],
@@ -829,6 +813,74 @@ class HealingApp {
     return { gainNode, nodes: [src, w1, w2] };
   }
 
+  // Fire: brown-noise rumble + crackle hiss with breathing LFO + random pop scheduler
+  _makeFire() {
+    const ac       = this.ac;
+    const gainNode = ac.createGain();
+    gainNode.gain.value = 0;
+    gainNode.connect(this.dryBus);
+    gainNode.connect(this.reverbSend);
+
+    const nodes = [];
+
+    // Low rumble base
+    const src1 = ac.createBufferSource();
+    src1.buffer = buildNoiseBuffer(ac, 'brown');
+    src1.loop   = true;
+    const lp1   = ac.createBiquadFilter();
+    lp1.type = 'lowpass'; lp1.frequency.value = 220; lp1.Q.value = 0.5;
+    const g1    = ac.createGain(); g1.gain.value = 0.30;
+    src1.connect(lp1); lp1.connect(g1); g1.connect(gainNode);
+    src1.start(); nodes.push(src1);
+
+    // Crackle hiss with "breathing" LFO
+    const src2 = ac.createBufferSource();
+    src2.buffer = buildNoiseBuffer(ac, 'pink');
+    src2.loop   = true;
+    const hp2   = ac.createBiquadFilter();
+    hp2.type = 'highpass'; hp2.frequency.value = 500; hp2.Q.value = 0.5;
+    const bp2   = ac.createBiquadFilter();
+    bp2.type = 'bandpass'; bp2.frequency.value = 1400; bp2.Q.value = 0.7;
+    const fLfo  = ac.createOscillator();
+    const fLfoG = ac.createGain();
+    fLfo.frequency.value = 0.09 + Math.random() * 0.07;
+    fLfoG.gain.value     = 0.15;
+    const g2    = ac.createGain(); g2.gain.value = 0.50;
+    fLfo.connect(fLfoG); fLfoG.connect(g2.gain);
+    src2.connect(hp2); hp2.connect(bp2); bp2.connect(g2); g2.connect(gainNode);
+    src2.start(); fLfo.start(); nodes.push(src2, fLfo);
+
+    // Random crackle pops — the signature of fire
+    const schedulePop = () => {
+      if (!this.isPlaying) return;
+      const now = ac.currentTime;
+      const dur = 0.03 + Math.random() * 0.06;
+      const sr  = ac.sampleRate;
+      const popBuf = ac.createBuffer(1, Math.round(sr * dur), sr);
+      const d = popBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (d.length * 0.07));
+
+      const popSrc = ac.createBufferSource();
+      popSrc.buffer = popBuf;
+      const hpP = ac.createBiquadFilter();
+      hpP.type = 'highpass'; hpP.frequency.value = 800;
+      const lpP = ac.createBiquadFilter();
+      lpP.type = 'lowpass';  lpP.frequency.value = 5500;
+      const env = ac.createGain();
+      const amp = 0.10 + Math.random() * 0.24;
+      env.gain.setValueAtTime(amp, now);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      popSrc.connect(hpP); hpP.connect(lpP); lpP.connect(env);
+      env.connect(gainNode);
+      popSrc.start(now);
+      this.schedulerTmrs.push(setTimeout(schedulePop, 250 + Math.random() * 2800));
+    };
+    this.schedulerTmrs.push(setTimeout(schedulePop, 600 + Math.random() * 1200));
+
+    return { gainNode, nodes };
+  }
+
   // Wind: pink noise through bandpass with slow filter + amplitude LFOs for gusting
   _makeWind() {
     const ac       = this.ac;
@@ -1173,6 +1225,11 @@ class HealingApp {
         case 'ocean': {
           const o = this._makeOcean();
           this.layers.push({ name: def.name, icon: def.icon, gainNode: o.gainNode, nodes: o.nodes, defaultVol: def.vol });
+          break;
+        }
+        case 'fire': {
+          const fi = this._makeFire();
+          this.layers.push({ name: def.name, icon: def.icon, gainNode: fi.gainNode, nodes: fi.nodes, defaultVol: def.vol });
           break;
         }
         case 'wind': {
