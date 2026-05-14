@@ -1008,7 +1008,7 @@ class HealingApp {
     return { gainNode, nodes: [src, w1, w2] };
   }
 
-  // Fire: brown-noise rumble + crackle hiss with breathing LFO + random pop scheduler
+  // Fire: almost-silent warmth base + realistic individual crackle/pop events
   _makeFire() {
     const ac       = this.ac;
     const gainNode = ac.createGain();
@@ -1018,60 +1018,64 @@ class HealingApp {
 
     const nodes = [];
 
-    // Low rumble base
-    const src1 = ac.createBufferSource();
-    src1.buffer = buildNoiseBuffer(ac, 'brown');
-    src1.loop   = true;
-    const lp1   = ac.createBiquadFilter();
-    lp1.type = 'lowpass'; lp1.frequency.value = 220; lp1.Q.value = 0.5;
-    const g1    = ac.createGain(); g1.gain.value = 0.30;
-    src1.connect(lp1); lp1.connect(g1); g1.connect(gainNode);
-    src1.start(); nodes.push(src1);
+    // Barely-there warmth hum — heat convection, very quiet
+    const src  = ac.createBufferSource();
+    src.buffer = buildNoiseBuffer(ac, 'brown');
+    src.loop   = true;
+    const lp   = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 130; lp.Q.value = 0.4;
+    const baseG = ac.createGain();
+    baseG.gain.value = 0.055;
+    src.connect(lp); lp.connect(baseG); baseG.connect(gainNode);
+    src.start(); nodes.push(src);
 
-    // Crackle hiss with "breathing" LFO
-    const src2 = ac.createBufferSource();
-    src2.buffer = buildNoiseBuffer(ac, 'pink');
-    src2.loop   = true;
-    const hp2   = ac.createBiquadFilter();
-    hp2.type = 'highpass'; hp2.frequency.value = 500; hp2.Q.value = 0.5;
-    const bp2   = ac.createBiquadFilter();
-    bp2.type = 'bandpass'; bp2.frequency.value = 1400; bp2.Q.value = 0.7;
-    const fLfo  = ac.createOscillator();
-    const fLfoG = ac.createGain();
-    fLfo.frequency.value = 0.09 + Math.random() * 0.07;
-    fLfoG.gain.value     = 0.15;
-    const g2    = ac.createGain(); g2.gain.value = 0.50;
-    fLfo.connect(fLfoG); fLfoG.connect(g2.gain);
-    src2.connect(hp2); hp2.connect(bp2); bp2.connect(g2); g2.connect(gainNode);
-    src2.start(); fLfo.start(); nodes.push(src2, fLfo);
+    // Single pop/crack event — wood fiber bursting under heat
+    const firePop = (when, ampScale = 1.0) => {
+      const sr  = ac.sampleRate;
+      const dur = 0.016 + Math.random() * 0.048;
+      const len = Math.round(sr * dur);
+      const buf = ac.createBuffer(1, len, sr);
+      const d   = buf.getChannelData(0);
+      // 1ms attack → sharp transient, then exponential decay
+      const atk = Math.round(sr * 0.001);
+      for (let i = 0; i < len; i++) {
+        const env = (i < atk ? i / atk : 1) * Math.exp(-i / (len * 0.16));
+        d[i] = (Math.random() * 2 - 1) * env;
+      }
+      const popSrc = ac.createBufferSource();
+      popSrc.buffer = buf;
+      // High-pass shapes the "crack" character; LP removes ultra-harsh digitals
+      const hp = ac.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 900 + Math.random() * 2000;
+      const lp2 = ac.createBiquadFilter();
+      lp2.type = 'lowpass'; lp2.frequency.value = 8000;
+      const g = ac.createGain();
+      g.gain.setValueAtTime((0.30 + Math.random() * 0.45) * ampScale, when);
+      popSrc.connect(hp); hp.connect(lp2); lp2.connect(g);
+      g.connect(gainNode);
+      popSrc.start(when);
+    };
 
-    // Random crackle pops — the signature of fire
-    const schedulePop = () => {
+    // Event scheduler: single pop / doublet / micro-burst, with 1-6s gaps
+    const schedule = () => {
       if (!this.isPlaying) return;
       const now = ac.currentTime;
-      const dur = 0.03 + Math.random() * 0.06;
-      const sr  = ac.sampleRate;
-      const popBuf = ac.createBuffer(1, Math.round(sr * dur), sr);
-      const d = popBuf.getChannelData(0);
-      for (let i = 0; i < d.length; i++)
-        d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (d.length * 0.07));
+      const r   = Math.random();
 
-      const popSrc = ac.createBufferSource();
-      popSrc.buffer = popBuf;
-      const hpP = ac.createBiquadFilter();
-      hpP.type = 'highpass'; hpP.frequency.value = 800;
-      const lpP = ac.createBiquadFilter();
-      lpP.type = 'lowpass';  lpP.frequency.value = 5500;
-      const env = ac.createGain();
-      const amp = 0.10 + Math.random() * 0.24;
-      env.gain.setValueAtTime(amp, now);
-      env.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-      popSrc.connect(hpP); hpP.connect(lpP); lpP.connect(env);
-      env.connect(gainNode);
-      popSrc.start(now);
-      this.schedulerTmrs.push(setTimeout(schedulePop, 250 + Math.random() * 2800));
+      if (r < 0.44) {
+        firePop(now);                                           // single crack
+      } else if (r < 0.70) {
+        firePop(now);                                           // wood-split doublet
+        firePop(now + 0.045 + Math.random() * 0.075);
+      } else {
+        const n = 3 + Math.floor(Math.random() * 4);           // sap-bubble burst
+        for (let i = 0; i < n; i++)
+          firePop(now + i * (0.009 + Math.random() * 0.016), 0.50);
+      }
+
+      this.schedulerTmrs.push(setTimeout(schedule, 1100 + Math.random() * 5200));
     };
-    this.schedulerTmrs.push(setTimeout(schedulePop, 600 + Math.random() * 1200));
+    this.schedulerTmrs.push(setTimeout(schedule, 700 + Math.random() * 1800));
 
     return { gainNode, nodes };
   }
