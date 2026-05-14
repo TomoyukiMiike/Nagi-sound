@@ -298,26 +298,12 @@ const PRESETS = {
         { type:'noise',    name:'ブラウンノイズ',     icon:'🌫️', noiseType:'brown', vol:0.40 },
       ]
     },
-    // 3: ホテルで自宅のように — 海辺の焚き火テーマ: fire + ocean + wind + solfeggio + pad + bowl
+    // 3: ホテルで自宅のように — 焚き火のみ: fire only
     {
-      breathe: [
-        { idx:0, min:0.36, max:0.54 },
-        { idx:1, min:0.50, max:0.72 },
-        { idx:2, min:0.46, max:0.68 },
-        { idx:3, min:0.38, max:0.60 },
-        { idx:4, min:0.28, max:0.50 },
-        { idx:5, min:0.18, max:0.38 },
-        { idx:6, min:0.20, max:0.44 },
-      ],
-      breatheInterval: 240,
+      breathe: [],
+      breatheInterval: 0,
       layers: [
-        { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.48 },
-        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.64 },
-        { type:'pad',       name:'弦楽器パッド',      icon:'🎻', freqs:[264,330,396,528], vol:0.62 },
-        { type:'fire',      name:'焚き火',            icon:'🔥', vol:0.44 },
-        { type:'ocean',     name:'波の音',            icon:'🌊', vol:0.34 },
-        { type:'wind',      name:'風の音',            icon:'🍃', vol:0.20 },
-        { type:'bowl',      name:'チベタンボウル',    icon:'🔔', interval:38000, vol:0.48 },
+        { type:'fire', name:'焚き火', icon:'🔥', vol:0.80 },
       ]
     },
     // 4: 勝負の前 — 森の川テーマ: stream + wind + pad + solfeggio + harp
