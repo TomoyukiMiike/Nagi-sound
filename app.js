@@ -1017,17 +1017,6 @@ class HealingApp {
 
     const nodes = [];
 
-    // Barely-there warmth hum — heat convection, very quiet
-    const src  = ac.createBufferSource();
-    src.buffer = buildNoiseBuffer(ac, 'brown');
-    src.loop   = true;
-    const lp   = ac.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 130; lp.Q.value = 0.4;
-    const baseG = ac.createGain();
-    baseG.gain.value = 0.055;
-    src.connect(lp); lp.connect(baseG); baseG.connect(gainNode);
-    src.start(); nodes.push(src);
-
     // Single pop/crack event — wood fiber bursting under heat
     const firePop = (when, ampScale = 1.0) => {
       const sr  = ac.sampleRate;
