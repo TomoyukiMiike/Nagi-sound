@@ -236,28 +236,28 @@ const PRESETS = {
   ],
 
   sleep: [
-    // 0: 家で静かに — 焚き火テーマ: fire + solfeggio + pad + harp
+    // 0: 家で静かに — オルガン＋ハープ: binaural + organ + solfeggio + harp + bowl
     {
       breathe: [
-        { idx:0, min:0.36, max:0.54 },
-        { idx:1, min:0.44, max:0.64 },
-        { idx:2, min:0.38, max:0.58 },
-        { idx:3, min:0.32, max:0.55 },
-        { idx:4, min:0.22, max:0.46 },
+        { idx:0, min:0.38, max:0.56 },
+        { idx:1, min:0.42, max:0.62 },
+        { idx:2, min:0.36, max:0.56 },
+        { idx:3, min:0.24, max:0.48 },
+        { idx:4, min:0.20, max:0.44 },
       ],
-      breatheInterval: 210,
+      breatheInterval: 220,
       layers: [
         { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.50 },
-        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.58 },
-        { type:'pad',       name:'弦楽器パッド',      icon:'🎻', freqs:[264,330,396], vol:0.56 },
-        { type:'fire',      name:'焚き火',            icon:'🔥', vol:0.48 },
+        { type:'organ',     name:'オルガン',           icon:'🎹', baseFreq:98.0, vol:0.52 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.54 },
         { type:'harp',      name:'ハープ',            icon:'🪕',
           patterns:[
             [132, null, 176, null, null],
             [null, 198, null, 132, null],
             [176, null, null, 264, null],
             [132, null, 198, null, null],
-          ], bpm:15, startDelay:7, vol:0.40 },
+          ], bpm:15, startDelay:7, vol:0.38 },
+        { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:22000, vol:0.46 },
       ]
     },
     // 1: 外で騒がしい中で — 雨の夜テーマ: rain + stream + brown noise
@@ -298,12 +298,18 @@ const PRESETS = {
         { type:'noise',    name:'ブラウンノイズ',     icon:'🌫️', noiseType:'brown', vol:0.40 },
       ]
     },
-    // 3: ホテルで自宅のように — 焚き火のみ: fire only
+    // 3: ホテルで自宅のように — 焚き火＋オルガン: fire + organ + binaural
     {
-      breathe: [],
-      breatheInterval: 0,
+      breathe: [
+        { idx:0, min:0.40, max:0.58 },
+        { idx:1, min:0.38, max:0.60 },
+        { idx:2, min:0.34, max:0.54 },
+      ],
+      breatheInterval: 200,
       layers: [
-        { type:'fire', name:'焚き火', icon:'🔥', vol:0.80 },
+        { type:'binaural', name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:6, driftTo:2, driftDuration:2400, vol:0.44 },
+        { type:'fire',     name:'焚き火',             icon:'🔥', vol:0.62 },
+        { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:65.41, vol:0.46 },
       ]
     },
     // 4: 勝負の前 — 森の川テーマ: stream + wind + pad + solfeggio + harp
@@ -1120,6 +1126,59 @@ class HealingApp {
     return { gainNode, nodes };
   }
 
+  // Organ: additive sine harmonics (drawbar-style) with gentle tremolo
+  _makeOrgan(baseFreq = 98.0) {
+    const ac       = this.ac;
+    const gainNode = ac.createGain();
+    gainNode.gain.value = 0;
+    gainNode.connect(this.dryBus);
+    gainNode.connect(this.reverbSend);
+
+    const nodes = [];
+
+    // Summing node before filter
+    const mixG = ac.createGain();
+    mixG.gain.value = 1;
+
+    // Soft LP to remove harsh upper partials
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 1600; lp.Q.value = 0.6;
+
+    // Tremolo (Leslie-style) at ~5.6Hz
+    const tremG     = ac.createGain();
+    tremG.gain.value = 0.86;
+    const tremLFO   = ac.createOscillator();
+    tremLFO.type    = 'sine';
+    tremLFO.frequency.value = 5.6;
+    const tremDepth = ac.createGain();
+    tremDepth.gain.value = 0.12;
+    tremLFO.connect(tremDepth);
+    tremDepth.connect(tremG.gain);
+    tremLFO.start();
+    nodes.push(tremLFO);
+
+    mixG.connect(lp); lp.connect(tremG); tremG.connect(gainNode);
+
+    // Drawbar harmonics: 16'(×0.5), 8'(×1), 5⅓'(×1.5), 4'(×2), 2⅔'(×3), 2'(×4)
+    [
+      { ratio: 0.5, gv: 0.30 },
+      { ratio: 1,   gv: 0.52 },
+      { ratio: 2,   gv: 0.34 },
+      { ratio: 3,   gv: 0.16 },
+      { ratio: 4,   gv: 0.09 },
+      { ratio: 6,   gv: 0.04 },
+    ].forEach(({ ratio, gv }) => {
+      const osc = ac.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = baseFreq * ratio;
+      const g = ac.createGain(); g.gain.value = gv;
+      osc.connect(g); g.connect(mixG);
+      osc.start(); nodes.push(osc);
+    });
+
+    return { gainNode, nodes };
+  }
+
   // Wind: pink noise through bandpass with slow filter + amplitude LFOs for gusting
   _makeWind() {
     const ac       = this.ac;
@@ -1469,6 +1528,11 @@ class HealingApp {
         case 'fire': {
           const fi = this._makeFire();
           this.layers.push({ name: def.name, icon: def.icon, gainNode: fi.gainNode, nodes: fi.nodes, defaultVol: def.vol });
+          break;
+        }
+        case 'organ': {
+          const og = this._makeOrgan(def.baseFreq || 98.0);
+          this.layers.push({ name: def.name, icon: def.icon, gainNode: og.gainNode, nodes: og.nodes, defaultVol: def.vol });
           break;
         }
         case 'wind': {
