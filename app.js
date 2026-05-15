@@ -1003,53 +1003,119 @@ class HealingApp {
 
     const nodes = [];
 
-    // Single pop/crack event — wood fiber bursting under heat
-    const firePop = (when, ampScale = 1.0) => {
+    // Layer 1: deep warmth hum with fast flicker (5-8Hz) — feels like flame, not wave
+    {
+      const src = ac.createBufferSource();
+      src.buffer = buildNoiseBuffer(ac, 'brown');
+      src.loop = true;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 95; lp.Q.value = 0.45;
+      const baseG = ac.createGain();
+      baseG.gain.value = 0.07;
+      const flickerLFO = ac.createOscillator();
+      flickerLFO.type = 'sawtooth';
+      flickerLFO.frequency.value = 5.2 + Math.random() * 3.0;
+      const flickerDepth = ac.createGain();
+      flickerDepth.gain.value = 0.045;
+      flickerLFO.connect(flickerDepth);
+      flickerDepth.connect(baseG.gain);
+      flickerLFO.start();
+      src.connect(lp); lp.connect(baseG); baseG.connect(gainNode);
+      src.start();
+      nodes.push(src, flickerLFO);
+    }
+
+    // Layer 2: mid-range micro-crackle texture — continuous burning presence
+    {
+      const src = ac.createBufferSource();
+      src.buffer = buildNoiseBuffer(ac, 'pink');
+      src.loop = true;
+      const hp = ac.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 700; hp.Q.value = 0.7;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 2800; lp.Q.value = 0.5;
+      const g = ac.createGain();
+      g.gain.value = 0.022;
+      const lfo = ac.createOscillator();
+      lfo.type = 'sawtooth';
+      lfo.frequency.value = 7.5 + Math.random() * 4.5;
+      const depth = ac.createGain();
+      depth.gain.value = 0.016;
+      lfo.connect(depth); depth.connect(g.gain);
+      lfo.start();
+      src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(gainNode);
+      src.start();
+      nodes.push(src, lfo);
+    }
+
+    // Sharp crack (high-freq transient)
+    const fireCrack = (when, ampScale = 1.0) => {
       const sr  = ac.sampleRate;
-      const dur = 0.016 + Math.random() * 0.048;
+      const dur = 0.010 + Math.random() * 0.028;
       const len = Math.round(sr * dur);
       const buf = ac.createBuffer(1, len, sr);
       const d   = buf.getChannelData(0);
-      // 1ms attack → sharp transient, then exponential decay
-      const atk = Math.round(sr * 0.001);
+      const atk = Math.round(sr * 0.0008);
       for (let i = 0; i < len; i++) {
-        const env = (i < atk ? i / atk : 1) * Math.exp(-i / (len * 0.16));
+        const env = (i < atk ? i / atk : 1) * Math.exp(-i / (len * 0.13));
         d[i] = (Math.random() * 2 - 1) * env;
       }
-      const popSrc = ac.createBufferSource();
-      popSrc.buffer = buf;
-      // High-pass shapes the "crack" character; LP removes ultra-harsh digitals
+      const s = ac.createBufferSource(); s.buffer = buf;
       const hp = ac.createBiquadFilter();
-      hp.type = 'highpass'; hp.frequency.value = 900 + Math.random() * 2000;
-      const lp2 = ac.createBiquadFilter();
-      lp2.type = 'lowpass'; lp2.frequency.value = 8000;
+      hp.type = 'highpass'; hp.frequency.value = 1400 + Math.random() * 2200;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 7500;
       const g = ac.createGain();
-      g.gain.setValueAtTime((0.30 + Math.random() * 0.45) * ampScale, when);
-      popSrc.connect(hp); hp.connect(lp2); lp2.connect(g);
-      g.connect(gainNode);
-      popSrc.start(when);
+      g.gain.setValueAtTime((0.25 + Math.random() * 0.38) * ampScale, when);
+      s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(gainNode);
+      s.start(when);
     };
 
-    // Event scheduler: single pop / doublet / micro-burst, with 1-6s gaps
+    // Deeper thud (low-freq wood settling)
+    const fireThud = (when, ampScale = 1.0) => {
+      const sr  = ac.sampleRate;
+      const dur = 0.022 + Math.random() * 0.038;
+      const len = Math.round(sr * dur);
+      const buf = ac.createBuffer(1, len, sr);
+      const d   = buf.getChannelData(0);
+      const atk = Math.round(sr * 0.002);
+      for (let i = 0; i < len; i++) {
+        const env = (i < atk ? i / atk : 1) * Math.exp(-i / (len * 0.22));
+        d[i] = (Math.random() * 2 - 1) * env;
+      }
+      const s = ac.createBufferSource(); s.buffer = buf;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 550 + Math.random() * 350;
+      const g = ac.createGain();
+      g.gain.setValueAtTime((0.16 + Math.random() * 0.18) * ampScale, when);
+      s.connect(lp); lp.connect(g); g.connect(gainNode);
+      s.start(when);
+    };
+
     const schedule = () => {
       if (!this.isPlaying) return;
       const now = ac.currentTime;
       const r   = Math.random();
 
-      if (r < 0.44) {
-        firePop(now);                                           // single crack
-      } else if (r < 0.70) {
-        firePop(now);                                           // wood-split doublet
-        firePop(now + 0.045 + Math.random() * 0.075);
+      if (r < 0.32) {
+        fireCrack(now);
+      } else if (r < 0.50) {
+        fireThud(now);
+      } else if (r < 0.68) {
+        fireCrack(now);
+        fireCrack(now + 0.038 + Math.random() * 0.072);
+      } else if (r < 0.82) {
+        fireCrack(now, 0.80);
+        fireThud(now + 0.025 + Math.random() * 0.045, 0.70);
       } else {
-        const n = 3 + Math.floor(Math.random() * 4);           // sap-bubble burst
+        const n = 3 + Math.floor(Math.random() * 3);
         for (let i = 0; i < n; i++)
-          firePop(now + i * (0.009 + Math.random() * 0.016), 0.50);
+          fireCrack(now + i * (0.007 + Math.random() * 0.013), 0.42);
       }
 
-      this.schedulerTmrs.push(setTimeout(schedule, 1100 + Math.random() * 5200));
+      this.schedulerTmrs.push(setTimeout(schedule, 900 + Math.random() * 4800));
     };
-    this.schedulerTmrs.push(setTimeout(schedule, 700 + Math.random() * 1800));
+    this.schedulerTmrs.push(setTimeout(schedule, 500 + Math.random() * 1500));
 
     return { gainNode, nodes };
   }
