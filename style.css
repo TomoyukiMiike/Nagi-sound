@@ -16,7 +16,7 @@
   --panel:    rgba(8,  24, 48,  0.92);
 
   --c-morning:    #fbbf24;
-  --c-ready:      #fb923c;
+  --c-relax:      #2dd4bf;
   --c-focus:      #38bdf8;
   --c-meditation: #e879f9;
   --c-sleep:      #818cf8;
@@ -134,7 +134,7 @@ html, body {
 /* Active state — per category color */
 .mode-tab.active                         { border-color: rgba(100,180,240,0.30); background: var(--glass); color: var(--text-hi); }
 .mode-tab[data-cat="morning"].active     { border-color: rgba(251,191,36,0.38);  background: rgba(251,191,36,0.08);  color: #fbbf24; }
-.mode-tab[data-cat="ready"].active       { border-color: rgba(251,146,60,0.38);  background: rgba(251,146,60,0.08);  color: #fb923c; }
+.mode-tab[data-cat="relax"].active       { border-color: rgba(45,212,191,0.38);  background: rgba(45,212,191,0.08);  color: #2dd4bf; }
 .mode-tab[data-cat="focus"].active       { border-color: rgba(56,189,248,0.38);  background: rgba(56,189,248,0.08);  color: #38bdf8; }
 .mode-tab[data-cat="meditation"].active  { border-color: rgba(232,121,249,0.38); background: rgba(232,121,249,0.08); color: #e879f9; }
 .mode-tab[data-cat="sleep"].active       { border-color: rgba(129,140,248,0.38); background: rgba(129,140,248,0.08); color: #818cf8; }
@@ -200,7 +200,7 @@ html, body {
 
 /* per-category active accent */
 .sit-chip.active[data-cat="morning"]    { background: rgba(251,191,36,0.10);  border-color: rgba(251,191,36,0.32);  color: #fde68a; }
-.sit-chip.active[data-cat="ready"]      { background: rgba(251,146,60,0.10);  border-color: rgba(251,146,60,0.32);  color: #fed7aa; }
+.sit-chip.active[data-cat="relax"]      { background: rgba(45,212,191,0.10);  border-color: rgba(45,212,191,0.32);  color: #99f6e4; }
 .sit-chip.active[data-cat="focus"]      { background: rgba(56,189,248,0.10);  border-color: rgba(56,189,248,0.32);  color: #bae6fd; }
 .sit-chip.active[data-cat="meditation"] { background: rgba(232,121,249,0.10); border-color: rgba(232,121,249,0.32); color: #f5d0fe; }
 .sit-chip.active[data-cat="sleep"]      { background: rgba(129,140,248,0.10); border-color: rgba(129,140,248,0.32); color: #c7d2fe; }

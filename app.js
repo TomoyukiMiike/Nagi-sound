@@ -469,7 +469,7 @@ const TIMER_OPTIONS = {
   sleep:      [{l:'なし',m:0},{l:'30分',m:30},{l:'1時間',m:60},{l:'90分',m:90},{l:'2時間',m:120},{l:'3時間',m:180},{l:'8時間',m:480}],
   focus:      [{l:'なし',m:0},{l:'25分',m:25},{l:'50分',m:50},{l:'90分',m:90}],
   morning:    [{l:'なし',m:0},{l:'15分',m:15},{l:'30分',m:30},{l:'60分',m:60}],
-  ready:      [{l:'なし',m:0},{l:'10分',m:10},{l:'20分',m:20},{l:'30分',m:30}],
+  relax:      [{l:'なし',m:0},{l:'15分',m:15},{l:'30分',m:30},{l:'45分',m:45},{l:'60分',m:60}],
 };
 
 // A major (bright, uplifting): A3=220 C#4=277.18 E4=329.63 A4=440 C#5=554.37 E5=659.25
@@ -596,126 +596,124 @@ PRESETS.morning = [
   },
 ];
 
-// D major (energetic): D4=293.66 F#4=369.99 A4=440 D5=587.33 F#5=739.99 A5=880
-PRESETS.ready = [
-  // 0: 家で静かに — 朝の活力: β波 + 弦楽パッド + ハープ + ピンク + 小鳥
+// C major pentatonic (calm): C4=261.63 E4=329.63 G4=392 A4=440 C5=523.25
+PRESETS.relax = [
+  // 0: 家で静かに — 深海の静寂: α波 + 波 + 弦楽パッド + ハープ + ボウル
+  {
+    breathe: [
+      { idx:0, min:0.38, max:0.54 },
+      { idx:1, min:0.44, max:0.62 },
+      { idx:2, min:0.40, max:0.58 },
+      { idx:3, min:0.26, max:0.46 },
+      { idx:4, min:0.30, max:0.50 },
+    ],
+    breatheInterval: 230,
+    layers: [
+      { type:'binaural',  name:'バイノーラル α波 8Hz',  icon:'〜', base:180, beat:8, vol:0.46 },
+      { type:'ocean',     name:'波の音',                icon:'🌊', vol:0.56 },
+      { type:'pad',       name:'弦楽器パッド',           icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.52 },
+      { type:'harp',      name:'ハープ',                 icon:'🪕',
+        patterns:[
+          [261.63, null, 392, null, null],
+          [null, 329.63, null, 261.63, null],
+          [392, null, null, 329.63, null],
+          [null, 261.63, null, null, 523.25],
+        ], bpm:16, startDelay:6, vol:0.40 },
+      { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:26000, vol:0.50 },
+    ]
+  },
+  // 1: 外で騒がしい中で — 雨音リラックス: α波 + 雨音 + ブラウン + 弦楽パッド + ハープ
+  {
+    breathe: [
+      { idx:0, min:0.42, max:0.58 },
+      { idx:1, min:0.48, max:0.66 },
+      { idx:2, min:0.34, max:0.52 },
+      { idx:3, min:0.36, max:0.56 },
+      { idx:4, min:0.24, max:0.44 },
+    ],
+    breatheInterval: 195,
+    layers: [
+      { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.50 },
+      { type:'rain',     name:'雨音',                 icon:'🌧️', vol:0.58 },
+      { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.34 },
+      { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[261.63,329.63,392], vol:0.48 },
+      { type:'harp',     name:'ハープ',                 icon:'🪕',
+        patterns:[
+          [261.63, null, null, 329.63, null],
+          [null, 392, null, 261.63, null],
+          [329.63, null, 261.63, null, null],
+          [null, null, 392, null, 261.63],
+        ], bpm:14, startDelay:8, vol:0.34 },
+    ]
+  },
+  // 2: 移動中に — 静かな雨: α波 + 雨音 + ブラウン + ハープ
   {
     breathe: [
       { idx:0, min:0.44, max:0.60 },
-      { idx:1, min:0.46, max:0.66 },
-      { idx:2, min:0.40, max:0.62 },
-      { idx:3, min:0.24, max:0.46 },
-      { idx:4, min:0.20, max:0.44 },
+      { idx:1, min:0.44, max:0.62 },
+      { idx:2, min:0.32, max:0.50 },
+      { idx:3, min:0.30, max:0.48 },
     ],
-    breatheInterval: 120,
+    breatheInterval: 175,
     layers: [
-      { type:'binaural', name:'バイノーラル β波 18Hz', icon:'〜', base:220, beat:18, vol:0.50 },
-      { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.58 },
+      { type:'binaural', name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.52 },
+      { type:'rain',     name:'雨音',                 icon:'🌧️', vol:0.55 },
+      { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.38 },
       { type:'harp',     name:'ハープ',                 icon:'🪕',
         patterns:[
-          [293.66, 369.99, 440, null, 587.33],
-          [440, 587.33, null, 440, 369.99],
-          [293.66, null, 440, 587.33, null],
-          [369.99, 440, null, 587.33, 440],
-        ], bpm:58, startDelay:3, vol:0.52 },
-      { type:'noise',  name:'ピンクノイズ',   icon:'🌫️', noiseType:'pink', vol:0.28 },
-      { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.36 },
+          [261.63, null, 329.63, null, null],
+          [null, 392, null, null, 261.63],
+          [329.63, null, null, 261.63, null],
+          [null, 261.63, null, 392, null],
+        ], bpm:13, startDelay:7, vol:0.36 },
     ]
   },
-  // 1: 外で騒がしい中で — マスキング活力: β波 + ピンク + ハープ + 弦楽パッド + 川の流れ
+  // 3: ホテルで自宅のように — リゾート海辺: α波 + 波 + 528Hz + 弦楽パッド + ハープ
   {
     breathe: [
-      { idx:0, min:0.48, max:0.64 },
-      { idx:1, min:0.38, max:0.60 },
-      { idx:2, min:0.36, max:0.58 },
-      { idx:3, min:0.40, max:0.62 },
-      { idx:4, min:0.18, max:0.38 },
+      { idx:0, min:0.36, max:0.52 },
+      { idx:1, min:0.48, max:0.66 },
+      { idx:2, min:0.50, max:0.68 },
+      { idx:3, min:0.30, max:0.50 },
+      { idx:4, min:0.22, max:0.42 },
     ],
-    breatheInterval: 100,
+    breatheInterval: 245,
     layers: [
-      { type:'binaural', name:'バイノーラル β波 18Hz', icon:'〜', base:220, beat:18, vol:0.55 },
-      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.46 },
-      { type:'harp',     name:'ハープ',                 icon:'🪕',
+      { type:'binaural',  name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.44 },
+      { type:'ocean',     name:'波の音',               icon:'🌊', vol:0.58 },
+      { type:'solfeggio', name:'528Hz ソルフェジオ',   icon:'✦',  vol:0.52 },
+      { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.56 },
+      { type:'harp',      name:'ハープ',                icon:'🪕',
         patterns:[
-          [293.66, 440, null, 587.33, null],
-          [369.99, null, 440, 587.33, 440],
-          [293.66, 369.99, null, 440, null],
-          [440, 587.33, 440, null, 369.99],
-        ], bpm:60, startDelay:3, vol:0.50 },
-      { type:'pad',    name:'弦楽器パッド', icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.52 },
-      { type:'stream', name:'川の流れ',     icon:'💧', vol:0.22 },
+          [261.63, 329.63, null, 392, null],
+          [329.63, null, 392, null, 261.63],
+          [null, 261.63, null, 329.63, 523.25],
+          [392, null, 329.63, 261.63, null],
+        ], bpm:17, startDelay:7, vol:0.40 },
     ]
   },
-  // 2: 移動中に — モバイル活力: β高め + ピンク + ブラウン + ハープ + 弦楽パッド
+  // 4: これから勝負の準備 — 試合前の静息: α波 + 川 + 弦楽パッド + ボウル + ハープ
   {
     breathe: [
-      { idx:0, min:0.50, max:0.66 },
-      { idx:1, min:0.36, max:0.58 },
-      { idx:2, min:0.24, max:0.46 },
-      { idx:3, min:0.36, max:0.58 },
-      { idx:4, min:0.36, max:0.58 },
+      { idx:0, min:0.40, max:0.58 },
+      { idx:1, min:0.44, max:0.62 },
+      { idx:2, min:0.42, max:0.60 },
+      { idx:3, min:0.28, max:0.48 },
+      { idx:4, min:0.26, max:0.46 },
     ],
-    breatheInterval: 90,
+    breatheInterval: 205,
     layers: [
-      { type:'binaural', name:'バイノーラル β波 20Hz', icon:'〜', base:220, beat:20, vol:0.58 },
-      { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.44 },
-      { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.30 },
-      { type:'harp',     name:'ハープ',                 icon:'🪕',
+      { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.48 },
+      { type:'stream',   name:'川の流れ',               icon:'💧', vol:0.46 },
+      { type:'pad',      name:'弦楽器パッド',            icon:'🎻', freqs:[261.63,329.63,392], vol:0.52 },
+      { type:'bowl',     name:'チベタンボウル',           icon:'🔔', interval:20000, vol:0.48 },
+      { type:'harp',     name:'ハープ',                  icon:'🪕',
         patterns:[
-          [293.66, 440, 587.33, null, 440],
-          [369.99, null, 440, 587.33, null],
-          [293.66, 369.99, null, 587.33, null],
-          [440, 587.33, null, 440, 369.99],
-        ], bpm:62, startDelay:2, vol:0.52 },
-      { type:'pad', name:'弦楽器パッド', icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.52 },
-    ]
-  },
-  // 3: ホテルで自宅のように — 旅の活力: β波 + 弦楽パッド + ハープ + ピンク + 風の音
-  {
-    breathe: [
-      { idx:0, min:0.44, max:0.60 },
-      { idx:1, min:0.50, max:0.70 },
-      { idx:2, min:0.40, max:0.62 },
-      { idx:3, min:0.22, max:0.44 },
-      { idx:4, min:0.16, max:0.34 },
-    ],
-    breatheInterval: 115,
-    layers: [
-      { type:'binaural', name:'バイノーラル β波 18Hz', icon:'〜', base:220, beat:18, vol:0.50 },
-      { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440,587.33,739.99], vol:0.62 },
-      { type:'harp',     name:'ハープ',                 icon:'🪕',
-        patterns:[
-          [440, 587.33, null, 739.99, 587.33],
-          [293.66, 369.99, 440, null, 587.33],
-          [587.33, null, 440, 369.99, null],
-          [440, 739.99, null, 587.33, null],
-        ], bpm:55, startDelay:3, vol:0.54 },
-      { type:'noise', name:'ピンクノイズ', icon:'🌫️', noiseType:'pink', vol:0.26 },
-      { type:'wind',  name:'風の音',       icon:'🍃', vol:0.20 },
-    ]
-  },
-  // 4: これから勝負の準備 — ピーク活性: β高め + 弦楽パッド + ハープ + ピンク + 焚き火
-  {
-    breathe: [
-      { idx:0, min:0.48, max:0.66 },
-      { idx:1, min:0.52, max:0.72 },
-      { idx:2, min:0.44, max:0.66 },
-      { idx:3, min:0.26, max:0.48 },
-      { idx:4, min:0.30, max:0.54 },
-    ],
-    breatheInterval: 85,
-    layers: [
-      { type:'binaural', name:'バイノーラル β波 22Hz', icon:'〜', base:220, beat:22, vol:0.55 },
-      { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,440,587.33,739.99], vol:0.62 },
-      { type:'harp',     name:'ハープ',                 icon:'🪕',
-        patterns:[
-          [293.66, 440, 587.33, 739.99, null],
-          [440, 587.33, 739.99, null, 880],
-          [293.66, 369.99, 440, 587.33, null],
-          [587.33, 739.99, null, 880, 739.99],
-        ], bpm:70, startDelay:2, vol:0.60 },
-      { type:'noise', name:'ピンクノイズ', icon:'🌫️', noiseType:'pink', vol:0.30 },
-      { type:'fire',  name:'焚き火',       icon:'🔥', vol:0.36 },
+          [261.63, null, 392, null, 329.63],
+          [null, 329.63, null, 261.63, null],
+          [392, null, 261.63, null, null],
+          [null, 261.63, 329.63, null, 392],
+        ], bpm:20, startDelay:6, vol:0.38 },
     ]
   },
 ];
@@ -1864,187 +1862,222 @@ class HealingApp {
       if      (cat === 'meditation') this._drawMeditation();
       else if (cat === 'sleep')      this._drawSleep();
       else if (cat === 'morning')    this._drawMorning();
-      else if (cat === 'ready')      this._drawReady();
+      else if (cat === 'relax')      this._drawRelax();
       else                           this._drawFocus();
       this.animFrame = requestAnimationFrame(render);
     };
     render();
   }
 
-  // ── 朝の目覚め — Aurora Dawn ─────────────────────────────────────────────
-  // 暁のオーロラリボン（水平）+ 地平線グロー + 黄金の光の粒
+  // Returns current hour as float (0–24) — used for time-of-day visual adaptation
+  _getHour() {
+    const n = new Date();
+    return n.getHours() + n.getMinutes() / 60 + n.getSeconds() / 3600;
+  }
+
+  // ── 朝の目覚め — Aurora Dawn (time-aware) ──────────────────────────────────
   _drawMorning() {
     const { ctx, canvas, t } = this;
     const W = canvas.width, H = canvas.height;
     const cx = W * 0.5;
+    const hr   = this._getHour();
+    const day  = Math.max(0, Math.sin((hr - 6) / 12 * Math.PI)); // 0=night→1=noon
+    const dawn = Math.max(0, 1 - Math.abs(hr - 6.5) / 2.8);     // peaks 6:30am
+    const aur  = Math.max(0, 1 - day * 0.88);                    // aurora fades at day
 
-    // Sky: deep indigo → twilight violet → dawn rose → amber horizon
+    // Sky base — night to morning gradient shifts with hour
     const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0,    '#070516');
-    sky.addColorStop(0.38, '#1a0830');
-    sky.addColorStop(0.65, '#3d1040');
-    sky.addColorStop(0.82, '#7a2018');
-    sky.addColorStop(1,    '#b84010');
+    sky.addColorStop(0,    `rgb(${(7  + day*16)|0},${(5 +day*10)|0},${(22+day*44)|0})`);
+    sky.addColorStop(0.40, `rgb(${(26 + day*24)|0},${(8 +day*20)|0},${(48+day*28)|0})`);
+    sky.addColorStop(0.65, `rgb(${(61 + dawn*60)|0},${(16+dawn*28)|0},${(64-dawn*18)|0})`);
+    sky.addColorStop(0.82, `rgb(${(122+ dawn*90)|0},${(32+dawn*32)|0},${(24+dawn*12)|0})`);
+    sky.addColorStop(1,    `rgb(${(184+ dawn*55)|0},${(64+dawn*24)|0},${16})`);
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
 
-    // Aurora ribbons — filled sine-wave polygons with vertical gradient
-    const bands = [
-      { y: 0.20, amp: 0.055, freq: 2.1, spd: 0.18, rgb: [70,210,240],   a: 0.30, h: 0.16 },
-      { y: 0.32, amp: 0.042, freq: 1.65,spd: 0.13, rgb: [200,100,210],  a: 0.24, h: 0.13 },
-      { y: 0.12, amp: 0.032, freq: 2.9, spd: 0.23, rgb: [255,190, 80],  a: 0.18, h: 0.10 },
-    ];
-    bands.forEach(b => {
-      const yM = b.y * H, hH = b.h * H;
-      const [r, g, bl] = b.rgb;
-      ctx.beginPath();
-      for (let x = 0; x <= W; x += 4) {
-        const w = Math.sin(x / W * Math.PI * b.freq + t * b.spd) * b.amp * H;
-        x === 0 ? ctx.moveTo(x, yM + w - hH) : ctx.lineTo(x, yM + w - hH);
-      }
-      for (let x = W; x >= 0; x -= 4) {
-        const w = Math.sin(x / W * Math.PI * b.freq + t * b.spd) * b.amp * H;
-        ctx.lineTo(x, yM + w + hH);
-      }
-      ctx.closePath();
-      const gr = ctx.createLinearGradient(0, yM - hH, 0, yM + hH * 1.5);
-      gr.addColorStop(0,    `rgba(${r},${g},${bl},0)`);
-      gr.addColorStop(0.30, `rgba(${r},${g},${bl},${b.a})`);
-      gr.addColorStop(0.65, `rgba(${r},${g},${bl},${(b.a * 0.55).toFixed(3)})`);
-      gr.addColorStop(1,    `rgba(${r},${g},${bl},0)`);
-      ctx.fillStyle = gr; ctx.fill();
-    });
+    // Aurora ribbons — brightest at night/pre-dawn, vanish by midday
+    if (aur > 0.03) {
+      const bands = [
+        { y: 0.20, amp: 0.055, freq: 2.1, spd: 0.18, rgb: [70,210,240],  a: 0.30*aur, h: 0.16 },
+        { y: 0.32, amp: 0.042, freq: 1.65,spd: 0.13, rgb: [200,100,210], a: 0.24*aur, h: 0.13 },
+        { y: 0.12, amp: 0.032, freq: 2.9, spd: 0.23, rgb: [255,190, 80], a: 0.18*aur, h: 0.10 },
+      ];
+      bands.forEach(b => {
+        const yM = b.y * H, hH = b.h * H;
+        const [r, g, bl] = b.rgb;
+        ctx.beginPath();
+        for (let x = 0; x <= W; x += 4) {
+          const w = Math.sin(x / W * Math.PI * b.freq + t * b.spd) * b.amp * H;
+          x === 0 ? ctx.moveTo(x, yM + w - hH) : ctx.lineTo(x, yM + w - hH);
+        }
+        for (let x = W; x >= 0; x -= 4) {
+          const w = Math.sin(x / W * Math.PI * b.freq + t * b.spd) * b.amp * H;
+          ctx.lineTo(x, yM + w + hH);
+        }
+        ctx.closePath();
+        const gr = ctx.createLinearGradient(0, yM - hH, 0, yM + hH * 1.5);
+        gr.addColorStop(0,    `rgba(${r},${g},${bl},0)`);
+        gr.addColorStop(0.30, `rgba(${r},${g},${bl},${b.a.toFixed(3)})`);
+        gr.addColorStop(0.65, `rgba(${r},${g},${bl},${(b.a*0.55).toFixed(3)})`);
+        gr.addColorStop(1,    `rgba(${r},${g},${bl},0)`);
+        ctx.fillStyle = gr; ctx.fill();
+      });
+    }
 
-    // Horizon glow
-    const hor = ctx.createRadialGradient(cx, H, 0, cx, H, H * 0.80);
-    hor.addColorStop(0,    'rgba(210,90,30,0.42)');
-    hor.addColorStop(0.38, 'rgba(170,45,70,0.16)');
-    hor.addColorStop(1,    'rgba(0,0,0,0)');
-    ctx.fillStyle = hor; ctx.fillRect(0, 0, W, H);
+    // Horizon glow — strongest at dawn, warm at day
+    const horA = dawn * 0.50 + day * 0.18;
+    if (horA > 0.02) {
+      const hor = ctx.createRadialGradient(cx, H, 0, cx, H, H * 0.80);
+      hor.addColorStop(0,    `rgba(210,90,30,${horA.toFixed(3)})`);
+      hor.addColorStop(0.38, `rgba(170,45,70,${(horA*0.35).toFixed(3)})`);
+      hor.addColorStop(1,    'rgba(0,0,0,0)');
+      ctx.fillStyle = hor; ctx.fillRect(0, 0, W, H);
+    }
 
-    // Sun cresting the horizon (slowly rises)
-    const sunR = Math.min(W, H) * 0.068;
-    const sunY = H * 0.98 - sunR * (0.5 + 0.35 * Math.abs(Math.sin(t * 0.006)));
-    const sunG = ctx.createRadialGradient(cx, sunY, 0, cx, sunY, sunR * 2.8);
-    sunG.addColorStop(0,   'rgba(255,245,180,0.96)');
-    sunG.addColorStop(0.35,'rgba(255,175,50, 0.55)');
-    sunG.addColorStop(1,   'rgba(255,110,20, 0)');
-    ctx.fillStyle = sunG; ctx.beginPath(); ctx.arc(cx, sunY, sunR * 2.8, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,252,220,0.95)';
-    ctx.beginPath(); ctx.arc(cx, sunY, sunR, 0, Math.PI * 2); ctx.fill();
+    // Sun — appears at hr≥5, rises and brightens
+    const sunVis = Math.max(0, Math.min(1, (hr - 5) / 3));
+    if (sunVis > 0.02) {
+      const sunR = Math.min(W, H) * 0.068;
+      // Night=just below horizon, dawn=cresting, morning=fully up
+      const sunY = H * 0.98 - sunR * (0.5 + sunVis * 2.2);
+      const sunG = ctx.createRadialGradient(cx, sunY, 0, cx, sunY, sunR * 2.8);
+      sunG.addColorStop(0,   `rgba(255,245,180,${(0.96*sunVis).toFixed(2)})`);
+      sunG.addColorStop(0.35,`rgba(255,175,50,${(0.55*sunVis).toFixed(2)})`);
+      sunG.addColorStop(1,   'rgba(255,110,20,0)');
+      ctx.fillStyle = sunG; ctx.beginPath(); ctx.arc(cx, sunY, sunR * 2.8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(255,252,220,${(0.95*sunVis).toFixed(2)})`;
+      ctx.beginPath(); ctx.arc(cx, sunY, sunR, 0, Math.PI * 2); ctx.fill();
+    }
 
-    // Drifting golden motes (float upward)
+    // Drifting motes — warm gold at dawn, cool at night, fade at midday
+    const moteColor = dawn > 0.2
+      ? `255,210,90`  // warm dawn gold
+      : (day > 0.5 ? `200,230,255` : `180,180,255`); // cool night/day
+    const moteAlphaBase = 0.12 + dawn * 0.30 + (1-day) * 0.15;
     for (let i = 0; i < 50; i++) {
       const s  = i * 137.508;
       const px = ((Math.sin(s * 0.17) + 1) / 2) * W;
       const vy = t * 0.00055 * (0.6 + 0.4 * Math.sin(s * 0.3));
       const py = ((((Math.sin(s * 0.11) + 1) / 2) - vy) % 1 + 1) % 1 * H;
-      const al = (0.14 + 0.55 * Math.abs(Math.sin(t * 0.38 + s))).toFixed(2);
-      const rr = 0.5 + 1.6 * Math.abs(Math.sin(s * 0.44));
-      ctx.fillStyle = `rgba(255,210,90,${al})`;
-      ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI * 2); ctx.fill();
+      const al = (Math.min(moteAlphaBase, 0.70) * Math.abs(Math.sin(t * 0.38 + s))).toFixed(2);
+      ctx.fillStyle = `rgba(${moteColor},${al})`;
+      ctx.beginPath(); ctx.arc(px, py, 0.5 + 1.6 * Math.abs(Math.sin(s * 0.44)), 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  // ── 朝の支度 — Solar Storm ───────────────────────────────────────────────
-  // 膨張する光の波紋 + 中心コア + スパイラル粒子アーム
-  _drawReady() {
+  // ── リラックス — Floating Orbs (time-aware) ───────────────────────────────
+  // ゆっくりと漂う発光体: 深海の生物発光 / 水面を漂う光
+  _drawRelax() {
     const { ctx, canvas, t } = this;
     const W = canvas.width, H = canvas.height;
-    const cx = W / 2, cy = H * 0.42;
+    const cx = W / 2, cy = H * 0.46;
     const U  = Math.min(W, H);
+    const hr   = this._getHour();
+    const day  = Math.max(0, Math.sin((hr - 6) / 12 * Math.PI));
+    const dusk = Math.max(0, 1 - Math.abs(hr - 18) / 3.0);  // peaks 6pm
 
-    ctx.fillStyle = '#090600'; ctx.fillRect(0, 0, W, H);
-    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, U * 0.65);
-    bg.addColorStop(0,   'rgba(200,90,10,0.20)');
-    bg.addColorStop(0.5, 'rgba(160,50,5,0.07)');
-    bg.addColorStop(1,   'transparent');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    // Background: deep teal at night, warm aqua at day, golden at dusk
+    const bgNight = [3, 22, 36];
+    const bgDay   = [5, 42, 65];
+    const bgDusk  = [24, 28, 52];
+    const bgR = (bgNight[0] + (bgDay[0]-bgNight[0])*day + (bgDusk[0]-bgNight[0])*dusk) | 0;
+    const bgG = (bgNight[1] + (bgDay[1]-bgNight[1])*day + (bgDusk[1]-bgNight[1])*dusk) | 0;
+    const bgB = (bgNight[2] + (bgDay[2]-bgNight[2])*day + (bgDusk[2]-bgNight[2])*dusk) | 0;
+    ctx.fillStyle = `rgb(${bgR},${bgG},${bgB})`; ctx.fillRect(0, 0, W, H);
 
-    // Expanding pulse rings (5 rings cycling continuously)
-    for (let i = 0; i < 5; i++) {
-      const prog  = ((t * 0.20 + i * 0.2) % 1);
-      const rRing = prog * U * 0.50;
-      const al    = (1 - prog) * 0.18;
-      ctx.beginPath(); ctx.arc(cx, cy, rRing, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(251,146,60,${al.toFixed(3)})`;
-      ctx.lineWidth = 1.4 * (1 - prog * 0.6); ctx.stroke();
-    }
+    // Ambient deep glow
+    const glowRgb = dusk > 0.2 ? `80,50,180` : `0,120,130`;
+    const glowG = ctx.createRadialGradient(cx, cy, 0, cx, cy, U * 0.55);
+    glowG.addColorStop(0,   `rgba(${glowRgb},${(0.15 + day*0.08).toFixed(3)})`);
+    glowG.addColorStop(1,   'transparent');
+    ctx.fillStyle = glowG; ctx.fillRect(0, 0, W, H);
 
-    // Central corona + core
-    const pulse = 0.5 + 0.5 * Math.sin(t * 2.0);
-    const cR    = U * (0.038 + 0.016 * pulse);
-    const corona = ctx.createRadialGradient(cx, cy, 0, cx, cy, cR * (5 + 2 * pulse));
-    corona.addColorStop(0,   `rgba(255,235,140,${0.60 + 0.20 * pulse})`);
-    corona.addColorStop(0.25,`rgba(251,146,60, ${0.28 + 0.12 * pulse})`);
-    corona.addColorStop(1,   'rgba(217,70,10,0)');
-    ctx.fillStyle = corona;
-    ctx.beginPath(); ctx.arc(cx, cy, cR * (5 + 2 * pulse), 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = `rgba(255,250,210,${0.90 + 0.08 * pulse})`;
-    ctx.beginPath(); ctx.arc(cx, cy, cR, 0, Math.PI * 2); ctx.fill();
+    // 3 large drifting orbs — slow Lissajous-like paths
+    const orbs = [
+      { px: cx + Math.sin(t*0.042) * W*0.26, py: cy + Math.cos(t*0.031) * H*0.18,
+        rgb: dusk > 0.3 ? [140,100,240] : (day>0.5 ? [0,200,200] : [0,180,180]), r: U*0.130 },
+      { px: cx + Math.sin(t*0.033 + 2.1) * W*0.22, py: cy + Math.cos(t*0.044 + 2.1) * H*0.16,
+        rgb: dusk > 0.3 ? [100,60,220]  : (day>0.5 ? [40,180,210] : [30,150,200]), r: U*0.105 },
+      { px: cx + Math.sin(t*0.055 + 4.3) * W*0.18, py: cy + Math.cos(t*0.038 + 4.3) * H*0.20,
+        rgb: dusk > 0.3 ? [180,120,255] : (day>0.5 ? [100,220,210] : [80,200,200]), r: U*0.090 },
+    ];
 
-    // Spiral particle arms (3 arms × 10 particles)
-    for (let arm = 0; arm < 3; arm++) {
-      const armBase = (arm / 3) * Math.PI * 2 + t * 0.60;
-      for (let p = 0; p < 10; p++) {
-        const prog = p / 10;
-        const ang  = armBase + prog * Math.PI * 1.5;
-        const dist = U * (0.08 + prog * 0.32);
-        const px   = cx + Math.cos(ang) * dist;
-        const py   = cy + Math.sin(ang) * dist;
-        const al   = ((1 - prog) * (0.55 + 0.35 * Math.abs(Math.sin(t * 1.1 + p)))).toFixed(2);
-        const rp   = (1 - prog * 0.65) * 2.8;
-        ctx.fillStyle = `rgba(251,191,36,${al})`;
-        ctx.beginPath(); ctx.arc(px, py, rp, 0, Math.PI * 2); ctx.fill();
+    orbs.forEach((o, oi) => {
+      const [r, g, b] = o.rgb;
+      const pulse = 0.5 + 0.5 * Math.sin(t * (0.55 + oi * 0.15) + oi * 2.1);
+
+      // Ripple rings from each orb (2 rings per orb, offset timing)
+      for (let ri = 0; ri < 2; ri++) {
+        const rProg = ((t * 0.10 + oi * 0.33 + ri * 0.5) % 1);
+        const rRad  = o.r * (0.9 + rProg * 3.5);
+        const rAlp  = (1 - rProg) * 0.15;
+        ctx.beginPath(); ctx.arc(o.px, o.py, rRad, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${r},${g},${b},${rAlp.toFixed(3)})`;
+        ctx.lineWidth = 1.2; ctx.stroke();
       }
-    }
 
-    // Ambient spark field
-    for (let i = 0; i < 28; i++) {
+      // Outer soft glow
+      const gG = ctx.createRadialGradient(o.px, o.py, 0, o.px, o.py, o.r * (2.8 + pulse));
+      gG.addColorStop(0,   `rgba(${r},${g},${b},${(0.18+pulse*0.10).toFixed(3)})`);
+      gG.addColorStop(0.4, `rgba(${r},${g},${b},${(0.06+pulse*0.04).toFixed(3)})`);
+      gG.addColorStop(1,   `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = gG; ctx.beginPath(); ctx.arc(o.px, o.py, o.r*(2.8+pulse), 0, Math.PI*2); ctx.fill();
+
+      // Core
+      const cG = ctx.createRadialGradient(o.px, o.py, 0, o.px, o.py, o.r);
+      cG.addColorStop(0,   `rgba(${Math.min(255,r+80)},${Math.min(255,g+60)},${Math.min(255,b+40)},${(0.55+pulse*0.25).toFixed(3)})`);
+      cG.addColorStop(0.5, `rgba(${r},${g},${b},${(0.30+pulse*0.12).toFixed(3)})`);
+      cG.addColorStop(1,   `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(o.px, o.py, o.r, 0, Math.PI*2); ctx.fill();
+    });
+
+    // Floating motes (slow drift)
+    const moteRgb = dusk > 0.2 ? `180,140,255` : `100,220,220`;
+    for (let i = 0; i < 40; i++) {
       const s  = i * 137.508;
-      const a  = s + t * (0.26 + 0.16 * Math.sin(s * 0.1));
-      const d  = U * (0.24 + 0.22 * Math.abs(Math.sin(s * 0.31)));
-      const px = cx + Math.cos(a) * d;
-      const py = cy + Math.sin(a) * d * 0.88;
-      const al = (0.08 + 0.38 * Math.abs(Math.sin(t * 0.75 + s))).toFixed(2);
-      ctx.fillStyle = `rgba(251,191,36,${al})`;
-      ctx.beginPath(); ctx.arc(px, py, 0.8 + 1.4 * Math.abs(Math.sin(s * 0.5)), 0, Math.PI * 2); ctx.fill();
+      const px = ((Math.sin(s * 0.17) + 1) / 2) * W;
+      const vy = t * 0.00035 * (0.5 + 0.5 * Math.sin(s * 0.3));
+      const py = ((((Math.sin(s * 0.11) + 1) / 2) - vy) % 1 + 1) % 1 * H;
+      const al = (0.08 + 0.42 * Math.abs(Math.sin(t * 0.28 + s))).toFixed(2);
+      ctx.fillStyle = `rgba(${moteRgb},${al})`;
+      ctx.beginPath(); ctx.arc(px, py, 0.6 + 1.4 * Math.abs(Math.sin(s * 0.44)), 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  // ── 集中 — Lissajous Flow ────────────────────────────────────────────────
-  // パラメトリック曲線（リサジュー）が緩やかに変形する — フロー状態の可視化
+  // ── 集中 — Lissajous Flow (time-aware) ───────────────────────────────────
   _drawFocus() {
     const { ctx, canvas, t } = this;
     const W = canvas.width, H = canvas.height;
     const cx = W / 2, cy = H * 0.44;
     const U  = Math.min(W, H);
+    const hr  = this._getHour();
+    const day = Math.max(0, Math.sin((hr - 6) / 12 * Math.PI));
+    // Morning=cool cyan, afternoon=emerald, evening=warm teal
+    const hueBase = 155 + day * 18;  // 155 (cool) → 173 (warm) at noon
+    const bgAlpha = 0.10 + day * 0.04;
 
     ctx.fillStyle = '#010c0a'; ctx.fillRect(0, 0, W, H);
     const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, U * 0.52);
-    bg.addColorStop(0,   `rgba(0,130,95,${0.10 + 0.04 * Math.sin(t * 0.5)})`);
+    bg.addColorStop(0,   `rgba(0,${(130+day*20)|0},${(95-day*10)|0},${bgAlpha.toFixed(3)})`);
     bg.addColorStop(1,   'transparent');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-    // Lissajous figure — a:b ratio morphs slowly (3:2 → 5:3)
     const A    = U * 0.28, B = U * 0.22;
     const fa   = 3;
-    const fb   = 2 + 0.08 * Math.sin(t * 0.028);   // gently morphs
-    const dphi = t * 0.055;                          // slow phase drift
+    const fb   = 2 + 0.08 * Math.sin(t * 0.028);
+    const dphi = t * 0.055;
 
     const STEPS = 220;
     for (let i = 0; i < STEPS; i++) {
       const θ   = (i / STEPS) * Math.PI * 2;
       const x   = cx + A * Math.sin(fa * θ + dphi);
       const y   = cy + B * Math.sin(fb * θ);
-      // Hue shifts teal → cyan → emerald along the curve
-      const hue = 155 + 45 * ((i / STEPS));
+      const hue = hueBase + 42 * (i / STEPS);
       const al  = (0.28 + 0.52 * Math.abs(Math.sin(θ * 3.1 + t * 0.7))).toFixed(2);
       const rr  = 1.2 + 1.5 * Math.abs(Math.sin(θ * 2.2 + t * 0.4));
       ctx.fillStyle = `hsla(${hue | 0},78%,62%,${al})`;
       ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Three moving highlight glows tracing the curve
     for (let k = 0; k < 3; k++) {
       const θ = (t * 0.72 + k * Math.PI * 2 / 3) % (Math.PI * 2);
       const x = cx + A * Math.sin(fa * θ + dphi);
@@ -2058,99 +2091,104 @@ class HealingApp {
       ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Faint sacred geometry backdrop (Flower of Life fragment)
-    const rot = t * 0.022;
-    const R   = U * 0.19;
+    const rot = t * 0.022, R = U * 0.19;
+    const gridAlpha = 0.025 + day * 0.015;
     ctx.lineWidth = 0.7;
-    ctx.strokeStyle = 'rgba(52,211,153,0.07)';
+    ctx.strokeStyle = `rgba(52,211,153,${gridAlpha.toFixed(3)})`;
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2 + rot;
       ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R, cy + Math.sin(a) * R, R, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
 
-    // Subtle grid
-    ctx.strokeStyle = 'rgba(52,211,153,0.035)'; ctx.lineWidth = 0.5;
-    const gStep = U * 0.088;
-    for (let x = cx % gStep; x < W; x += gStep) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-    for (let y = cy % gStep; y < H; y += gStep) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    const gridStep = U * 0.088;
+    ctx.strokeStyle = `rgba(52,211,153,${(gridAlpha*0.8).toFixed(3)})`; ctx.lineWidth = 0.5;
+    for (let x = cx % gridStep; x < W; x += gridStep) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = cy % gridStep; y < H; y += gridStep) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
   }
 
-  // ── 瞑想 — Breathing Mandala ─────────────────────────────────────────────
-  // 呼吸マンダラ: 多層リプル + フラワーペタル + 呼吸インジケーター
+  // ── 瞑想 — Breathing Mandala (time-aware) ────────────────────────────────
   _drawMeditation() {
     const { ctx, canvas, t } = this;
     const W = canvas.width, H = canvas.height;
     const cx = W / 2, cy = H * 0.42;
     const U  = Math.min(W, H);
+    const hr   = this._getHour();
+    const dusk = Math.max(0, 1 - Math.abs(hr - 18) / 3.2);  // peaks 6pm
+    const night = Math.max(0, -Math.sin((hr - 6) / 12 * Math.PI)); // 1=night
 
+    // Background: purple at night, adds warm amber at dusk
     ctx.fillStyle = '#060212'; ctx.fillRect(0, 0, W, H);
     const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, U * 0.60);
-    bg.addColorStop(0,   'rgba(100,28,140,0.26)');
-    bg.addColorStop(0.55,'rgba(70,20,110,0.10)');
+    bg.addColorStop(0,   `rgba(${(100+dusk*60)|0},${(28-dusk*10)|0},${(140-dusk*20)|0},${(0.26+dusk*0.08).toFixed(3)})`);
+    bg.addColorStop(0.55,`rgba(70,20,110,${(0.10+dusk*0.04).toFixed(3)})`);
     bg.addColorStop(1,   'transparent');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-    // Breath cycle (4-4-4-4 pattern: in / hold / out / rest)
+    // Dusk horizon glow (meditation at sunset)
+    if (dusk > 0.05) {
+      const duskG = ctx.createLinearGradient(0, H * 0.6, 0, H);
+      duskG.addColorStop(0, `rgba(200,80,20,0)`);
+      duskG.addColorStop(1, `rgba(200,80,20,${(dusk * 0.22).toFixed(3)})`);
+      ctx.fillStyle = duskG; ctx.fillRect(0, 0, W, H);
+    }
+
     const ph = (t % 16) / 16;
     let ratio, label;
     if      (ph < 0.25) { ratio = ph / 0.25;              label = '吸　う'; }
     else if (ph < 0.50) { ratio = 1;                      label = '保　つ'; }
     else if (ph < 0.75) { ratio = 1 - (ph - 0.50) / 0.25; label = '吐　く'; }
     else                { ratio = 0;                      label = '　　…'; }
-    const cR = U * (0.09 + 0.17 * ratio);  // core radius breathes
+    const cR = U * (0.09 + 0.17 * ratio);
 
-    // Ripple rings (6 rings, offset timing — like ripples from a stone)
+    // Color shifts warm at dusk: violet → rose-violet
+    const rimR = (192 + dusk * 50) | 0;
+    const rimG = (105 - dusk * 30) | 0;
+    const rimB = (255 - dusk * 40) | 0;
+
     for (let i = 0; i < 6; i++) {
       const prog = ((t * 0.16 + i / 6) % 1);
       const rRip = cR + prog * U * 0.44;
       const al   = (1 - prog) * 0.22;
       if (al < 0.008) continue;
       ctx.beginPath(); ctx.arc(cx, cy, rRip, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(192,105,255,${al.toFixed(3)})`;
+      ctx.strokeStyle = `rgba(${rimR},${rimG},${rimB},${al.toFixed(3)})`;
       ctx.lineWidth = 1.4 * (1 - prog * 0.5); ctx.stroke();
     }
 
-    // Outer petal ring (12 petals, slowly rotating)
     const rotOuter = t * 0.020;
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2 + rotOuter;
-      const pr = cR * 0.72, pd = cR * 0.80;
-      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * pd, cy + Math.sin(a) * pd, pr, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(180,100,255,${(0.06 + ratio * 0.05).toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * cR*0.80, cy + Math.sin(a) * cR*0.80, cR*0.72, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(${rimR},${rimG},${rimB},${(0.06+ratio*0.05).toFixed(3)})`;
       ctx.lineWidth = 0.7; ctx.stroke();
     }
-    // Inner petal ring (6 petals, counter-rotating)
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2 - rotOuter * 1.4;
-      const pr = cR * 0.88, pd = cR * 0.92;
-      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * pd, cy + Math.sin(a) * pd, pr, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(216,150,255,${(0.10 + ratio * 0.08).toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * cR*0.92, cy + Math.sin(a) * cR*0.92, cR*0.88, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(${rimR},${rimG},${rimB},${(0.10+ratio*0.08).toFixed(3)})`;
       ctx.lineWidth = 0.8; ctx.stroke();
     }
 
-    // Core glow layers
     for (let i = 3; i >= 1; i--) {
       const g = ctx.createRadialGradient(cx, cy, cR * 0.6, cx, cy, cR * (1 + i * 0.60));
-      g.addColorStop(0, `rgba(200,140,255,${(0.13 / i).toFixed(3)})`);
+      g.addColorStop(0, `rgba(${rimR},${(140+dusk*30)|0},255,${(0.13 / i).toFixed(3)})`);
       g.addColorStop(1, 'transparent');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, cR * (1 + i * 0.60), 0, Math.PI * 2); ctx.fill();
     }
     const cG = ctx.createRadialGradient(cx, cy, 0, cx, cy, cR);
-    cG.addColorStop(0,    'rgba(245,220,255,0.62)');
-    cG.addColorStop(0.55, 'rgba(160, 80,255,0.28)');
-    cG.addColorStop(1,    'rgba(100, 40,220,0.04)');
+    cG.addColorStop(0,    `rgba(245,${(220+dusk*20)|0},${(255-dusk*30)|0},0.62)`);
+    cG.addColorStop(0.55, `rgba(${(160+dusk*40)|0},${(80-dusk*30)|0},255,0.28)`);
+    cG.addColorStop(1,    'rgba(100,40,220,0.04)');
     ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(cx, cy, cR, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = `rgba(216,180,254,${(0.32 + ratio * 0.38).toFixed(3)})`;
+    ctx.strokeStyle = `rgba(${rimR},${rimG},${rimB},${(0.32+ratio*0.38).toFixed(3)})`;
     ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, cR, 0, Math.PI * 2); ctx.stroke();
 
-    // Breath label
     ctx.fillStyle = 'rgba(255,255,255,0.86)';
     ctx.font = `${(U * 0.042) | 0}px -apple-system, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(label, cx, cy);
 
-    // Orbiting particles
     for (let i = 0; i < 36; i++) {
       const s  = i * 137.508;
       const a  = s + t * (0.055 + 0.035 * Math.sin(s * 0.2));
@@ -2158,30 +2196,33 @@ class HealingApp {
       const px = cx + Math.cos(a) * d;
       const py = cy + Math.sin(a) * d * 0.86;
       const al = (0.10 + 0.48 * Math.abs(Math.sin(t * 0.26 + s))).toFixed(2);
-      ctx.fillStyle = `rgba(220,195,255,${al})`;
+      ctx.fillStyle = `rgba(${(220+dusk*30)|0},${(195-dusk*30)|0},255,${al})`;
       ctx.beginPath(); ctx.arc(px, py, 0.7 + 1.9 * Math.abs(Math.sin(s * 0.3)), 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  // ── 睡眠 — Aurora Night ──────────────────────────────────────────────────
-  // 縦のオーロラカーテン + 星野 + 月 + 波紋
+  // ── 睡眠 — Aurora Night (time-aware) ─────────────────────────────────────
   _drawSleep() {
     const { ctx, canvas, t } = this;
     const W = canvas.width, H = canvas.height;
+    const hr    = this._getHour();
+    const night = Math.max(0, 1 - Math.max(0, Math.sin((hr - 6) / 12 * Math.PI))); // 1=night
+    const deep  = Math.max(0, 1 - Math.abs(hr - 0) / 4); // deepest at midnight
 
-    // Deep space gradient
+    // Sky — deeper at actual night, slightly lighter if daytime
     const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0,   '#010710');
-    sky.addColorStop(0.45,'#030c1c');
-    sky.addColorStop(0.85,'#050f22');
-    sky.addColorStop(1,   '#040d1a');
+    sky.addColorStop(0,    `rgb(${(1 +night*0)|0},${(7+night*0)|0},${(16+night*0)|0})`);
+    sky.addColorStop(0.45, `rgb(3,${(12+night*0)|0},${(28-night*2)|0})`);
+    sky.addColorStop(0.85, `rgb(5,${(15+night*0)|0},${(34-night*4)|0})`);
+    sky.addColorStop(1,    `rgb(4,13,${(26-night*2)|0})`);
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
 
-    // Vertical aurora curtains (3 bands, sine-wave polygon edges)
+    // Aurora curtains — brightest at actual night
+    const auroraAlpha = 0.10 + night * 0.14;
     const curtains = [
-      { xR: 0.25, wR: 0.32, spd: 0.080, ph: 0.0, rgb: [0,  195, 155], a: 0.22 },
-      { xR: 0.58, wR: 0.28, spd: 0.065, ph: 2.1, rgb: [70, 120, 220], a: 0.18 },
-      { xR: 0.76, wR: 0.22, spd: 0.100, ph: 4.4, rgb: [140, 55, 200], a: 0.14 },
+      { xR: 0.25, wR: 0.32, spd: 0.080, ph: 0.0, rgb: [0,  195, 155], a: auroraAlpha },
+      { xR: 0.58, wR: 0.28, spd: 0.065, ph: 2.1, rgb: [70, 120, 220], a: auroraAlpha * 0.80 },
+      { xR: 0.76, wR: 0.22, spd: 0.100, ph: 4.4, rgb: [140, 55, 200], a: auroraAlpha * 0.62 },
     ];
     curtains.forEach(c => {
       const xC = (c.xR + Math.sin(t * c.spd + c.ph) * 0.06) * W;
@@ -2202,28 +2243,29 @@ class HealingApp {
       ctx.closePath();
       const gr = ctx.createLinearGradient(0, 0, 0, H * 0.90);
       gr.addColorStop(0,    `rgba(${r},${g},${b},0)`);
-      gr.addColorStop(0.12, `rgba(${r},${g},${b},${c.a})`);
+      gr.addColorStop(0.12, `rgba(${r},${g},${b},${c.a.toFixed(3)})`);
       gr.addColorStop(0.65, `rgba(${r},${g},${b},${(c.a * 0.52).toFixed(3)})`);
       gr.addColorStop(1,    `rgba(${r},${g},${b},0)`);
       ctx.fillStyle = gr; ctx.fill();
     });
 
-    // Star field (deterministic, twinkle over time)
+    // Stars — brighter at actual night
+    const starBrightness = 0.12 + night * 0.55;
     for (let i = 0; i < 80; i++) {
       const s  = i * 127.1;
       const sx = ((Math.sin(s * 0.11) + 1) / 2) * W;
       const sy = ((Math.sin(s * 0.073) + 1) / 2) * H * 0.78;
-      const tw = 0.10 + 0.55 * Math.abs(Math.sin(t * (0.0003 + (i % 7) * 0.00005) * 5000 + s));
+      const tw = starBrightness * Math.abs(Math.sin(t * (0.0003 + (i % 7) * 0.00005) * 5000 + s));
       const sr = 0.35 + 1.4 * Math.abs(Math.sin(s * 0.29));
       ctx.fillStyle = `rgba(200,225,255,${tw.toFixed(2)})`;
       ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Moon: disc + soft halo
+    // Moon — always visible, halo brightens at night
     const mx = W * 0.74, my = H * 0.17;
     const mr = Math.min(W, H) * 0.064;
     const mhG = ctx.createRadialGradient(mx, my, mr * 0.8, mx, my, mr * 3.2);
-    mhG.addColorStop(0,   'rgba(195,215,255,0.12)');
+    mhG.addColorStop(0,   `rgba(195,215,255,${(0.06+night*0.09).toFixed(3)})`);
     mhG.addColorStop(1,   'transparent');
     ctx.fillStyle = mhG; ctx.beginPath(); ctx.arc(mx, my, mr * 3.2, 0, Math.PI * 2); ctx.fill();
     const mG = ctx.createRadialGradient(mx - mr * 0.18, my - mr * 0.18, 0, mx, my, mr);
@@ -2232,7 +2274,7 @@ class HealingApp {
     mG.addColorStop(1,   'rgba(190,182,148,0.35)');
     ctx.fillStyle = mG; ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
 
-    // Gentle ocean waves at the bottom
+    // Ocean waves — always present
     for (let w = 0; w < 4; w++) {
       const baseY = H * (0.82 + w * 0.045);
       ctx.strokeStyle = `rgba(20,100,180,${(0.18 - w * 0.035).toFixed(3)})`;
@@ -2261,6 +2303,11 @@ class HealingApp {
   }
 
   _selectMode(cat) {
+    // Pre-warm: start audio decoding on first UI interaction so play is instant
+    if (!this.ac || this.ac.state === 'closed') {
+      this._initAudio();
+    }
+
     if (cat === this._uiCat && !this.isPlaying) return;
 
     const wasPlaying = this.isPlaying;
@@ -2290,6 +2337,11 @@ class HealingApp {
   }
 
   _selectSituation(idx) {
+    // Pre-warm: start audio decoding on first UI interaction so play is instant
+    if (!this.ac || this.ac.state === 'closed') {
+      this._initAudio();
+    }
+
     if (idx === this._uiMood) return;
     const wasPlaying = this.isPlaying;
     this._uiMood = idx;
@@ -2325,7 +2377,7 @@ class HealingApp {
   _renderModeTagline() {
     const TAGS = {
       morning:   'α→β波でやさしく覚醒',
-      ready:     'β波でテンションアップ',
+      relax:     'α波でゆっくりリラックス',
       focus:     'α波でフロー状態へ',
       meditation:'θ波で深い瞑想状態へ',
       sleep:     'δ波で深い眠りへ',
