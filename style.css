@@ -228,6 +228,32 @@ html, body {
 }
 .category-card:hover .card-arrow { color: var(--text-mid); transform: translateX(2px); }
 
+/* ── Resume button ("前回の続きから") ── */
+.resume-btn {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0.5rem;
+  margin: 0.2rem 1rem 0.6rem;
+  padding: 0.72rem 1.2rem;
+  background: rgba(125,211,252,0.08);
+  border: 1px solid rgba(125,211,252,0.22);
+  border-radius: 0.85rem;
+  cursor: pointer; width: calc(100% - 2rem);
+  color: rgba(125,211,252,0.80);
+  font-family: inherit; font-size: 0.80rem;
+  letter-spacing: 0.10em;
+  transition: background 0.20s, border-color 0.20s, color 0.20s, transform 0.18s;
+  flex-shrink: 0;
+}
+.resume-btn:hover {
+  background: rgba(125,211,252,0.16);
+  border-color: rgba(125,211,252,0.42);
+  color: rgba(190,235,255,0.95);
+  transform: translateY(-1px);
+}
+.resume-btn:active { transform: translateY(0); }
+.resume-btn-icon { font-size: 0.70rem; opacity: 0.75; }
+.resume-btn-text { font-weight: 400; }
+
 .headphone-tip {
   font-size: 0.61rem; color: rgba(125,211,252,0.18);
   text-align: center;

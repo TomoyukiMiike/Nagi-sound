@@ -735,6 +735,8 @@ class HealingApp {
     this.currentMood   = null;
     this.layers        = [];
     this.schedulerTmrs = [];
+
+    this._PREFS_KEY = 'nagi_prefs';
     this.animFrame     = null;
 
     this.timerMins      = 0;
@@ -1583,11 +1585,22 @@ class HealingApp {
       }
     });
 
-    this.layers.forEach(l => {
+    // Apply saved layer volumes if available; otherwise use preset defaults
+    const savedVols = this._savedLayerVols(cat, moodId);
+    this.layers.forEach((l, idx) => {
+      const vol = (savedVols && savedVols[idx] != null) ? savedVols[idx] : l.defaultVol;
       l.gainNode.gain.cancelScheduledValues(this.ac.currentTime);
       l.gainNode.gain.setValueAtTime(0, this.ac.currentTime);
-      l.gainNode.gain.linearRampToValueAtTime(l.defaultVol, this.ac.currentTime + 3.5);
+      l.gainNode.gain.linearRampToValueAtTime(vol, this.ac.currentTime + 3.5);
     });
+
+    // Save last session & master volume
+    this._savePrefs({
+      lastCat:   cat,
+      lastMood:  moodId,
+      masterVol: document.getElementById('master-vol').value,
+    });
+    this._refreshResumeBtn();
 
     // Start organic volume breathing if preset defines it
     if (preset.breathe) {
@@ -1724,23 +1737,79 @@ class HealingApp {
 
   // ── Layer UI ──────────────────────────────────────────────────────────────
 
+  // ── Preferences (localStorage) ───────────────────────────────────────────
+
+  _loadPrefs() {
+    try { return JSON.parse(localStorage.getItem(this._PREFS_KEY)) || {}; }
+    catch { return {}; }
+  }
+
+  _savePrefs(patch) {
+    try {
+      const prefs = this._loadPrefs();
+      Object.assign(prefs, patch);
+      localStorage.setItem(this._PREFS_KEY, JSON.stringify(prefs));
+    } catch { /* storage blocked */ }
+  }
+
+  _prefsKey(cat, mood) { return `${cat}:${mood}`; }
+
+  // Save current layer volumes for this cat/mood
+  _saveLayerVols() {
+    if (!this.currentCat && this.currentCat !== 0) return;
+    const vols = this.layers.map(l => {
+      const slider = document.querySelector(`.layer-slider[data-idx="${this.layers.indexOf(l)}"]`);
+      return slider ? +slider.value / 100 : l.defaultVol;
+    });
+    const layerVols = this._loadPrefs().layerVols || {};
+    layerVols[this._prefsKey(this.currentCat, this.currentMood)] = vols;
+    this._savePrefs({ layerVols });
+  }
+
+  // Load saved layer volumes for this cat/mood, or null if none
+  _savedLayerVols(cat, mood) {
+    const prefs = this._loadPrefs();
+    return (prefs.layerVols && prefs.layerVols[this._prefsKey(cat, mood)]) || null;
+  }
+
+  // Show/hide "前回の続きから" button based on saved session
+  _refreshResumeBtn() {
+    const prefs = this._loadPrefs();
+    let btn = document.getElementById('btn-resume');
+    if (!btn) return;
+    if (prefs.lastCat != null && prefs.lastMood != null) {
+      btn.style.display = 'flex';
+    } else {
+      btn.style.display = 'none';
+    }
+  }
+
   _renderLayers() {
-    const container = document.getElementById('layers-container');
+    const container  = document.getElementById('layers-container');
     container.innerHTML = '';
+    const savedVols  = this._savedLayerVols(this.currentCat, this.currentMood);
+
     this.layers.forEach((layer, idx) => {
+      // Use saved volume if available, otherwise preset default
+      const initVol = (savedVols && savedVols[idx] != null)
+        ? savedVols[idx]
+        : layer.defaultVol;
+
       const row = document.createElement('div');
       row.className = 'layer-row';
       row.innerHTML = `
         <button class="layer-toggle on" data-idx="${idx}">${layer.icon}</button>
         <span class="layer-name">${layer.name}</span>
         <input type="range" class="layer-slider" min="0" max="100"
-          value="${Math.round(layer.defaultVol * 100)}" data-idx="${idx}">
+          value="${Math.round(initVol * 100)}" data-idx="${idx}">
       `;
+
       row.querySelector('.layer-slider').addEventListener('input', e => {
         const l = this.layers[+e.target.dataset.idx];
         if (!l) return;
         l.gainNode.gain.cancelScheduledValues(this.ac.currentTime);
         l.gainNode.gain.setTargetAtTime(+e.target.value / 100, this.ac.currentTime, 0.1);
+        this._saveLayerVols();  // ← 自動保存
       });
       row.querySelector('.layer-toggle').addEventListener('click', e => {
         const btn = e.currentTarget;
@@ -1750,6 +1819,7 @@ class HealingApp {
         const vol = btn.classList.contains('on')
           ? row.querySelector('.layer-slider').value / 100 : 0;
         l.gainNode.gain.setTargetAtTime(vol, this.ac.currentTime, 0.4);
+        this._saveLayerVols();  // ← 自動保存
       });
       container.appendChild(row);
     });
@@ -2164,7 +2234,26 @@ class HealingApp {
     document.getElementById('master-vol').addEventListener('input', e => {
       if (this.masterGain && this.isPlaying)
         this.masterGain.gain.setTargetAtTime(+e.target.value / 100, this.ac.currentTime, 0.1);
+      this._savePrefs({ masterVol: e.target.value });  // ← 自動保存
     });
+
+    // ── Restore master volume from last session ──
+    const savedPrefs = this._loadPrefs();
+    if (savedPrefs.masterVol != null) {
+      document.getElementById('master-vol').value = savedPrefs.masterVol;
+    }
+
+    // ── "前回の続きから" button ──
+    const resumeBtn = document.getElementById('btn-resume');
+    if (resumeBtn) {
+      this._refreshResumeBtn();
+      resumeBtn.addEventListener('click', () => {
+        const prefs = this._loadPrefs();
+        if (prefs.lastCat != null && prefs.lastMood != null) {
+          this._showPlayer(prefs.lastCat, prefs.lastMood);
+        }
+      });
+    }
 
     // timer buttons are rendered dynamically in _renderTimerBtns(cat)
   }
