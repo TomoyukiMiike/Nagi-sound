@@ -205,6 +205,66 @@ html, body {
 .sit-chip.active[data-cat="meditation"] { background: rgba(232,121,249,0.10); border-color: rgba(232,121,249,0.32); color: #f5d0fe; }
 .sit-chip.active[data-cat="sleep"]      { background: rgba(129,140,248,0.10); border-color: rgba(129,140,248,0.32); color: #c7d2fe; }
 
+/* ── ④b Preset selector ── */
+.preset-row {
+  display: flex; align-items: center;
+  gap: 0.45rem;
+  padding: 0.28rem 0.90rem;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+}
+
+.preset-pills {
+  display: flex; gap: 0.22rem; flex: 1;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.preset-pills::-webkit-scrollbar { display: none; }
+
+.preset-pill {
+  padding: 0.18rem 0.68rem;
+  border-radius: 2rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-lo);
+  font-size: 0.60rem; font-family: inherit;
+  white-space: nowrap; flex-shrink: 0;
+  cursor: pointer; letter-spacing: 0.04em;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.preset-pill:active { transform: scale(0.95); }
+.preset-pill.active {
+  background: var(--glass);
+  border-color: var(--border-h);
+  color: var(--text-hi);
+}
+.preset-pill.has-custom::after {
+  content: '●';
+  font-size: 0.38rem;
+  color: rgba(125,211,252,0.75);
+  margin-left: 0.28rem;
+  vertical-align: super;
+}
+
+.preset-save-btn {
+  padding: 0.16rem 0.52rem;
+  border-radius: 0.38rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-lo);
+  font-size: 0.60rem; font-family: inherit;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  letter-spacing: 0.03em;
+  transition: all 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+.preset-save-btn:hover, .preset-save-btn.active {
+  background: rgba(56,189,248,0.14);
+  border-color: rgba(56,189,248,0.36);
+  color: rgba(125,211,252,0.92);
+}
+
 /* ── ⑤ Layer panel ── */
 .layer-panel {
   flex-shrink: 0;
