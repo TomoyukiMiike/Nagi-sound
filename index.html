@@ -69,6 +69,14 @@
       <div class="vis-overlay">
         <p id="mode-sub" class="mode-sub"></p>
       </div>
+      <!-- Breath guide overlay -->
+      <div id="breath-guide" class="breath-guide">
+        <div id="breath-ring" class="breath-ring"></div>
+        <p id="breath-text" class="breath-text">息を吸って</p>
+        <p id="breath-count" class="breath-count">あと 5 回</p>
+      </div>
+      <!-- Journey phase badge -->
+      <div id="journey-phase-badge" class="journey-phase-badge hidden"></div>
     </div>
 
     <!-- ④ Situation chips -->
@@ -80,6 +88,18 @@
     <!-- ⑤ Layer sliders -->
     <div class="layer-panel">
       <div id="layers-container"></div>
+    </div>
+
+    <!-- Sleep extras (journey + breath, shown only in sleep mode) -->
+    <div id="sleep-extras" class="sleep-extras hidden">
+      <button id="journey-btn" class="sleep-extra-btn">
+        <span class="sleep-extra-icon">🌙</span>
+        <span class="sleep-extra-label">スリープジャーニー</span>
+      </button>
+      <button id="breath-btn" class="sleep-extra-btn">
+        <span class="sleep-extra-icon">🫁</span>
+        <span class="sleep-extra-label">呼吸ガイド</span>
+      </button>
     </div>
 
     <!-- ⑥ Controls: volume + timer + play -->

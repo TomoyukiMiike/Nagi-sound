@@ -111,6 +111,14 @@ const MOOD_LABELS = [
   { id: 'pre-game',   label: 'これから勝負の準備',          icon: '⚡', desc: '落ち着いた集中モードへ' },
 ];
 
+const SLEEP_MOODS = [
+  { id: 'bedroom',  label: '深夜の寝室',         icon: '🌙', desc: '静かな寝室でゆっくりと' },
+  { id: 'noise',    label: '騒音をマスクして',   icon: '🔇', desc: '外の音を遮断して眠る' },
+  { id: 'transit',  label: '移動中の仮眠',        icon: '🚃', desc: '電車・飛行機でうとうと' },
+  { id: 'hotel',    label: 'ホテルでの眠り',      icon: '🏨', desc: '慣れない場所でも深く眠る' },
+  { id: 'powernap', label: 'パワーナップ',        icon: '⚡', desc: '20分の最高の仮眠' },
+];
+
 const PRESETS = {
   meditation: [
     // 0: 家で静かに — 深い静寂: θ波 + 528Hz + 弦楽パッド + ハープ + ボウル
@@ -371,15 +379,19 @@ const PRESETS = {
           { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.50 },
           { type:'organ',     name:'オルガン',           icon:'🎹', baseFreq:98.0, vol:0.52 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.54 },
-          { type:'harp',      name:'ハープ',            icon:'🪕',
-            patterns:[
-              [132, null, 176, null, null],
-              [null, 198, null, 132, null],
-              [176, null, null, 264, null],
-              [132, null, 198, null, null],
-            ], bpm:15, startDelay:7, vol:0.38 },
-          { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:22000, vol:0.46 },
-          { type:'rain', name:'雨音', icon:'🌧️', vol:0.20 },
+          { type:'harp',      name:'ハープ',             icon:'🪕',
+            patterns:[[132,null,176,null,null],[null,198,null,132,null],[176,null,null,264,null],[132,null,198,null,null]],
+            bpm:15, startDelay:7, vol:0.38 },
+          { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:22000, vol:0.46 },
+          { type:'wind',      name:'風の音',              icon:'🍃', vol:0.16 },
+        ]},
+        { name: 'ジャーニー', journey: true, layers: [
+          { type:'binaural', name:'バイノーラル α→δ旅', icon:'〜', base:264, beat:8, driftTo:1.0, driftDuration:3600, vol:0.52 },
+          { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:98.0, vol:0.40 },
+          { type:'noise',    name:'ブラウンノイズ',       icon:'🌫️', noiseType:'brown', vol:0.28 },
+          { type:'harp',     name:'ハープ',              icon:'🪕',
+            patterns:[[132,null,176,null,null],[null,198,null,132,null],[176,null,null,264,null],[null,132,null,198,null]],
+            bpm:10, startDelay:10, vol:0.28 },
         ]},
       ]
     },
@@ -418,13 +430,14 @@ const PRESETS = {
           { type:'stream',   name:'川の流れ',           icon:'💧', vol:0.40 },
           { type:'noise',    name:'ブラウンノイズ',     icon:'🌫️', noiseType:'brown', vol:0.38 },
           { type:'harp',     name:'ハープ',            icon:'🪕',
-            patterns:[
-              [132, null, null, 176, null],
-              [null, null, 198, null, null],
-              [176, null, 132, null, null],
-              [null, 198, null, null, 176],
-            ], bpm:15, startDelay:10, vol:0.32 },
-          { type:'organ', name:'オルガン', icon:'🎹', baseFreq:65.41, vol:0.30 },
+            patterns:[[132,null,null,176,null],[null,null,198,null,null],[176,null,132,null,null],[null,198,null,null,176]],
+            bpm:15, startDelay:10, vol:0.32 },
+          { type:'organ',    name:'オルガン',           icon:'🎹', baseFreq:65.41, vol:0.28 },
+        ]},
+        { name: 'ジャーニー', journey: true, layers: [
+          { type:'binaural', name:'バイノーラル α→δ旅', icon:'〜', base:264, beat:8, driftTo:1.0, driftDuration:3600, vol:0.55 },
+          { type:'rain',     name:'雨音',               icon:'🌧️', vol:0.52 },
+          { type:'noise',    name:'ブラウンノイズ',       icon:'🌫️', noiseType:'brown', vol:0.38 },
         ]},
       ]
     },
@@ -450,11 +463,14 @@ const PRESETS = {
           { type:'binaural', name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:6, driftTo:1.5, driftDuration:3000, vol:0.58 },
           { type:'rain',     name:'雨音',              icon:'🌧️', vol:0.54 },
           { type:'noise',    name:'ブラウンノイズ',     icon:'🌫️', noiseType:'brown', vol:0.40 },
-          { type:'stream', name:'川の流れ', icon:'💧', vol:0.24 },
-          { type:'harp', name:'ハープ', icon:'🪕',
-            patterns:[
-              [132,null,176,null,null],[null,198,null,132,null],[176,null,null,264,null],[132,null,198,null,null],
-            ], bpm:12, startDelay:10, vol:0.28 },
+          { type:'stream',   name:'川の流れ',           icon:'💧', vol:0.24 },
+          { type:'harp',     name:'ハープ',            icon:'🪕',
+            patterns:[[132,null,176,null,null],[null,198,null,132,null],[176,null,null,264,null],[132,null,198,null,null]],
+            bpm:12, startDelay:10, vol:0.28 },
+        ]},
+        { name: 'ジャーニー', journey: true, layers: [
+          { type:'binaural', name:'バイノーラル α→δ旅', icon:'〜', base:264, beat:8, driftTo:1.0, driftDuration:3600, vol:0.56 },
+          { type:'noise',    name:'ブラウンノイズ',       icon:'🌫️', noiseType:'brown', vol:0.42 },
         ]},
       ]
     },
@@ -478,10 +494,16 @@ const PRESETS = {
         ]},
         { name:'ディープ', layers: [
           { type:'binaural', name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:6, driftTo:2, driftDuration:2400, vol:0.44 },
-          { type:'fire',     name:'焚き火',             icon:'🔥', vol:0.62 },
+          { type:'fire',     name:'焚き火',             icon:'🔥', vol:0.55 },
           { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:65.41, vol:0.46 },
-          { type:'rain', name:'雨音', icon:'🌧️', vol:0.20 },
-          { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:25000, vol:0.36 },
+          { type:'noise',    name:'ブラウンノイズ',      icon:'🌫️', noiseType:'brown', vol:0.24 },
+          { type:'bowl',     name:'チベタンボウル',      icon:'🔔', interval:28000, vol:0.36 },
+        ]},
+        { name: 'ジャーニー', journey: true, layers: [
+          { type:'binaural', name:'バイノーラル α→δ旅', icon:'〜', base:264, beat:8, driftTo:1.0, driftDuration:3600, vol:0.50 },
+          { type:'fire',     name:'焚き火',             icon:'🔥', vol:0.46 },
+          { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:65.41, vol:0.36 },
+          { type:'noise',    name:'ブラウンノイズ',       icon:'🌫️', noiseType:'brown', vol:0.22 },
         ]},
       ]
     },
@@ -519,17 +541,17 @@ const PRESETS = {
         { name:'ディープ', layers: [
           { type:'binaural',  name:'バイノーラル α→δ',  icon:'〜', base:264, beat:9, driftTo:2, driftDuration:2400, vol:0.52 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.60 },
-          { type:'pad',       name:'弦楽器パッド',      icon:'🎻', freqs:[264,330,396], vol:0.54 },
+          { type:'pad',       name:'弦楽器パッド',       icon:'🎻', freqs:[264,330,396], vol:0.54 },
           { type:'stream',    name:'川の流れ',           icon:'💧', vol:0.38 },
           { type:'wind',      name:'風の音',             icon:'🍃', vol:0.28 },
           { type:'harp',      name:'ハープ',            icon:'🪕',
-            patterns:[
-              [132, null, 198, null, null],
-              [null, 176, null, null, 132],
-              [264, null, null, 176, null],
-              [null, 132, null, 198, null],
-            ], bpm:15, startDelay:8, vol:0.38 },
-          { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:22000, vol:0.34 },
+            patterns:[[132,null,198,null,null],[null,176,null,null,132],[264,null,null,176,null],[null,132,null,198,null]],
+            bpm:15, startDelay:8, vol:0.38 },
+        ]},
+        { name: 'ジャーニー', journey: true, napMode: true, layers: [
+          { type:'binaural', name:'バイノーラル α→θ旅', icon:'〜', base:256, beat:9, driftTo:4.0, driftDuration:1200, vol:0.54 },
+          { type:'noise',    name:'ピンクノイズ',        icon:'🌫️', noiseType:'pink', vol:0.36 },
+          { type:'stream',   name:'川の流れ',            icon:'💧', vol:0.30 },
         ]},
       ]
     },
@@ -763,7 +785,7 @@ const PRESETS = {
 
 const TIMER_OPTIONS = {
   meditation: [{l:'なし',m:0},{l:'10分',m:10},{l:'20分',m:20},{l:'30分',m:30},{l:'60分',m:60}],
-  sleep:      [{l:'なし',m:0},{l:'30分',m:30},{l:'1時間',m:60},{l:'90分',m:90},{l:'2時間',m:120},{l:'3時間',m:180},{l:'8時間',m:480}],
+  sleep:      [{l:'なし',m:0},{l:'20分(仮眠)',m:20},{l:'90分',m:90},{l:'3時間',m:180},{l:'4.5時間',m:270},{l:'6時間',m:360},{l:'7.5時間',m:450},{l:'9時間',m:540}],
   focus:      [{l:'なし',m:0},{l:'25分',m:25},{l:'50分',m:50},{l:'90分',m:90}],
   morning:    [{l:'なし',m:0},{l:'15分',m:15},{l:'30分',m:30},{l:'60分',m:60}],
   relax:      [{l:'なし',m:0},{l:'15分',m:15},{l:'30分',m:30},{l:'45分',m:45},{l:'60分',m:60}],
@@ -1258,6 +1280,12 @@ class HealingApp {
     this.soundBuffers  = {};    // keyed by sound name, AudioBuffer once loaded
     this._soundsReady  = Promise.resolve();  // resolves after all files decoded
 
+    this._journeyTimers = [];
+    this._journeyPhase  = 0;
+
+    this._breathGuideActive = false;
+    this._breathTimers      = [];
+
     this._initUI();
     this._initBgCanvas();
   }
@@ -1751,6 +1779,55 @@ class HealingApp {
     return { gainNode, nodes };
   }
 
+  _makeCrickets() {
+    const ac = this.ac;
+    const gainNode = ac.createGain();
+    gainNode.gain.value = 0;
+    gainNode.connect(this.dryBus);
+    gainNode.connect(this.reverbSend);
+
+    const nodes = [];
+    const sumG = ac.createGain();
+    sumG.gain.value = 0.20;
+    sumG.connect(gainNode);
+
+    // 4 cricket voices at slightly detuned frequencies with independent chirp rates
+    [
+      { freq: 3180, chirpRate: 6.5, vol: 0.55 },
+      { freq: 3320, chirpRate: 6.1, vol: 0.45 },
+      { freq: 3050, chirpRate: 5.8, vol: 0.38 },
+      { freq: 3460, chirpRate: 7.0, vol: 0.30 },
+    ].forEach(({ freq, chirpRate, vol }) => {
+      const src = ac.createBufferSource();
+      src.buffer = buildNoiseBuffer(ac, 'pink');
+      src.loop = true;
+
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = freq;
+      bp.Q.value = 20 + Math.random() * 8;
+
+      const am = ac.createGain();
+      am.gain.value = 0.5;
+      const lfo = ac.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = chirpRate;
+      const depth = ac.createGain();
+      depth.gain.value = 0.5;
+      lfo.connect(depth);
+      depth.connect(am.gain);
+      lfo.start();
+
+      const vg = ac.createGain();
+      vg.gain.value = vol;
+      src.connect(bp); bp.connect(am); am.connect(vg); vg.connect(sumG);
+      src.start();
+      nodes.push(src, lfo);
+    });
+
+    return { gainNode, nodes };
+  }
+
   // Wind: pink noise through bandpass with slow filter + amplitude LFOs for gusting
   _makeWind() {
     return this._makeFileLoop('wind', false);
@@ -1993,6 +2070,13 @@ class HealingApp {
     this.schedulerTmrs.forEach(clearTimeout);
     this.schedulerTmrs = [];
 
+    this._journeyTimers.forEach(clearTimeout);
+    this._journeyTimers = [];
+    this._journeyPhase = 0;
+    this._updateJourneyPhaseDisplay();
+
+    this._stopBreathGuide();
+
     this._stopTimer();
     if (this.animFrame) { cancelAnimationFrame(this.animFrame); this.animFrame = null; }
 
@@ -2039,7 +2123,7 @@ class HealingApp {
       switch (def.type) {
         case 'binaural': {
           const b = this._makeBinauralBeat(def.base, def.beat);
-          this.layers.push({ name: def.name, icon: def.icon, gainNode: b.gainNode, nodes: [], defaultVol: def.vol });
+          this.layers.push({ name: def.name, icon: def.icon, gainNode: b.gainNode, nodes: [], defaultVol: def.vol, rightOsc: b.rightOsc, binauralBase: def.base });
           // Frequency drift: slowly deepen the beat frequency over driftDuration seconds
           if (def.driftTo != null && b.rightOsc) {
             b.rightOsc.frequency.setValueAtTime(def.base + def.beat, this.ac.currentTime);
@@ -2119,6 +2203,11 @@ class HealingApp {
           this._scheduleBirds(g);
           break;
         }
+        case 'cricket': {
+          const cr = this._makeCrickets();
+          this.layers.push({ name: def.name, icon: def.icon, gainNode: cr.gainNode, nodes: cr.nodes, defaultVol: def.vol });
+          break;
+        }
       }
     });
 
@@ -2146,6 +2235,15 @@ class HealingApp {
     this._renderLayers();
     this._updatePlayBtn(true);
     this._startVisuals(cat);
+
+    // Start journey phases if this preset has journey:true
+    const activePr = PRESETS[cat][moodId].presets[this._uiPreset];
+    if (activePr && activePr.journey) {
+      this._scheduleJourneyPhases(activePr.napMode === true);
+    }
+
+    // Update sleep extras panel visibility
+    this._updateSleepExtras(cat);
   }
 
   // ── Volume breathing: each layer slowly wanders between its min/max ────────
@@ -2874,6 +2972,169 @@ class HealingApp {
     }
   }
 
+  // ── Journey phase system ──────────────────────────────────────────────────
+
+  _scheduleJourneyPhases(isNap = false) {
+    this._journeyTimers.forEach(clearTimeout);
+    this._journeyTimers = [];
+    this._journeyPhase = 1;
+    this._updateJourneyPhaseDisplay();
+
+    if (isNap) {
+      // Nap mode: just 1 phase, auto-sets 20min timer suggestion
+      return;
+    }
+
+    // Phase 2 at 20 min: show ドリフト
+    this._journeyTimers.push(setTimeout(() => {
+      if (!this.isPlaying) return;
+      this._journeyPhase = 2;
+      this._updateJourneyPhaseDisplay();
+      // Gently reduce nature layer volumes
+      this.layers.forEach((l) => {
+        if (!l.rightOsc) { // non-binaural layers
+          const now = this.ac.currentTime;
+          const cur = l.gainNode.gain.value;
+          l.gainNode.gain.setTargetAtTime(cur * 0.85, now, 120);
+        }
+      });
+    }, 20 * 60 * 1000));
+
+    // Phase 3 at 60 min: show 深い眠り
+    this._journeyTimers.push(setTimeout(() => {
+      if (!this.isPlaying) return;
+      this._journeyPhase = 3;
+      this._updateJourneyPhaseDisplay();
+      // Further reduce non-binaural layers
+      this.layers.forEach((l) => {
+        if (!l.rightOsc) {
+          const now = this.ac.currentTime;
+          const cur = l.gainNode.gain.value;
+          l.gainNode.gain.setTargetAtTime(cur * 0.70, now, 180);
+        }
+      });
+    }, 60 * 60 * 1000));
+  }
+
+  _updateJourneyPhaseDisplay() {
+    const badge = document.getElementById('journey-phase-badge');
+    if (!badge) return;
+    const labels = ['', '🌙 入眠フェーズ', '✨ ドリフト中', '💫 深い眠り'];
+    if (this._journeyPhase > 0) {
+      badge.textContent = labels[this._journeyPhase] || '';
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  // ── Breathing Guide ───────────────────────────────────────────────────────
+
+  _toggleBreathGuide() {
+    if (this._breathGuideActive) {
+      this._stopBreathGuide();
+    } else {
+      this._startBreathGuide(5);
+    }
+    const btn = document.getElementById('breath-btn');
+    if (btn) btn.classList.toggle('active', this._breathGuideActive);
+  }
+
+  _startBreathGuide(cycles = 5) {
+    this._breathGuideActive = true;
+    this._breathTimers.forEach(clearTimeout);
+    this._breathTimers = [];
+
+    const guide  = document.getElementById('breath-guide');
+    const ring   = document.getElementById('breath-ring');
+    const text   = document.getElementById('breath-text');
+    const countEl = document.getElementById('breath-count');
+    if (!guide) return;
+
+    guide.classList.add('active');
+    let cyclesDone = 0;
+
+    const runCycle = () => {
+      if (!this._breathGuideActive || cyclesDone >= cycles) {
+        this._stopBreathGuide();
+        return;
+      }
+      cyclesDone++;
+      if (countEl) countEl.textContent = `あと ${cycles - cyclesDone + 1} 回`;
+
+      // Inhale 4s
+      if (ring) ring.className = 'breath-ring inhale';
+      if (text) text.textContent = '息を吸って';
+
+      this._breathTimers.push(setTimeout(() => {
+        if (!this._breathGuideActive) return;
+        // Hold 7s
+        if (ring) ring.className = 'breath-ring hold';
+        if (text) text.textContent = '止める';
+
+        this._breathTimers.push(setTimeout(() => {
+          if (!this._breathGuideActive) return;
+          // Exhale 8s
+          if (ring) ring.className = 'breath-ring exhale';
+          if (text) text.textContent = '吐いて';
+          this._breathTimers.push(setTimeout(runCycle, 8000));
+        }, 7000));
+      }, 4000));
+    };
+
+    runCycle();
+  }
+
+  _stopBreathGuide() {
+    this._breathGuideActive = false;
+    this._breathTimers.forEach(clearTimeout);
+    this._breathTimers = [];
+    const guide = document.getElementById('breath-guide');
+    if (guide) guide.classList.remove('active');
+    const ring  = document.getElementById('breath-ring');
+    if (ring)  ring.className = 'breath-ring';
+    const btn = document.getElementById('breath-btn');
+    if (btn)   btn.classList.remove('active');
+    this._updateJourneyPhaseDisplay(); // restore journey display if active
+  }
+
+  // ── Sleep extras panel ───────────────────────────────────────────────────
+
+  _updateSleepExtras(cat) {
+    const el = document.getElementById('sleep-extras');
+    if (!el) return;
+    if (cat === 'sleep') {
+      el.classList.remove('hidden');
+      // Wire up buttons once
+      const journeyBtn = document.getElementById('journey-btn');
+      if (journeyBtn && !journeyBtn._listenerAdded) {
+        journeyBtn._listenerAdded = true;
+        journeyBtn.addEventListener('click', () => {
+          const isJourney = this._uiPreset === 3;
+          this._uiPreset = isJourney ? 1 : 3;
+          this._renderPresetRow(this._uiCat, this._uiMood);
+          journeyBtn.classList.toggle('active', !isJourney);
+          if (this.isPlaying) {
+            this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.10);
+            this._stopLayersOnly();
+            this._startCategory(this._uiCat, this._uiMood, 1.0);
+          }
+        });
+      }
+      const breathBtn = document.getElementById('breath-btn');
+      if (breathBtn && !breathBtn._listenerAdded) {
+        breathBtn._listenerAdded = true;
+        breathBtn.addEventListener('click', () => this._toggleBreathGuide());
+      }
+    } else {
+      el.classList.add('hidden');
+      if (this._breathGuideActive) this._stopBreathGuide();
+      // Reset journey phase badge
+      const badge = document.getElementById('journey-phase-badge');
+      if (badge) badge.classList.add('hidden');
+    }
+  }
+
   // ── Mode & situation selection ───────────────────────────────────────────
 
   // Short labels for situation chips (compact horizontal rail)
@@ -2911,6 +3172,7 @@ class HealingApp {
     this._renderModeTagline();
     this._renderTimerBtns(cat);
     this._renderPresetRow(cat, 0);
+    this._updateSleepExtras(cat);
     if (!wasPlaying) this._renderLayersPreview();
 
     // Canvas switches immediately (no audio dependency)
@@ -2953,7 +3215,8 @@ class HealingApp {
     const rail = document.getElementById('sit-rail');
     rail.innerHTML = '';
     const cat = this._uiCat;
-    MOOD_LABELS.forEach((mood, idx) => {
+    const moods = (cat === 'sleep') ? SLEEP_MOODS : MOOD_LABELS;
+    moods.forEach((mood, idx) => {
       const btn = document.createElement('button');
       btn.className   = 'sit-chip' + (idx === this._uiMood ? ' active' : '');
       btn.dataset.idx = idx;
@@ -3025,6 +3288,7 @@ class HealingApp {
     this._renderModeTagline();
     this._renderTimerBtns(this._uiCat);
     this._renderPresetRow(this._uiCat, this._uiMood);
+    this._updateSleepExtras(this._uiCat);
     this._renderLayersPreview();
 
     // ── Play button ──
