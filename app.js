@@ -737,6 +737,8 @@ class HealingApp {
     this.schedulerTmrs = [];
 
     this._PREFS_KEY = 'nagi_prefs';
+    this._uiCat        = 'morning';  // currently selected mode tab
+    this._uiMood       = 0;          // currently selected situation chip
     this.animFrame     = null;
 
     this.timerMins      = 0;
@@ -1600,7 +1602,6 @@ class HealingApp {
       lastMood:  moodId,
       masterVol: document.getElementById('master-vol').value,
     });
-    this._refreshResumeBtn();
 
     // Start organic volume breathing if preset defines it
     if (preset.breathe) {
@@ -1770,18 +1771,6 @@ class HealingApp {
   _savedLayerVols(cat, mood) {
     const prefs = this._loadPrefs();
     return (prefs.layerVols && prefs.layerVols[this._prefsKey(cat, mood)]) || null;
-  }
-
-  // Show/hide "前回の続きから" button based on saved session
-  _refreshResumeBtn() {
-    const prefs = this._loadPrefs();
-    let btn = document.getElementById('btn-resume');
-    if (!btn) return;
-    if (prefs.lastCat != null && prefs.lastMood != null) {
-      btn.style.display = 'flex';
-    } else {
-      btn.style.display = 'none';
-    }
   }
 
   _renderLayers() {
@@ -2142,120 +2131,180 @@ class HealingApp {
     }
   }
 
-  // ── Navigation ────────────────────────────────────────────────────────────
+  // ── Mode & situation selection ───────────────────────────────────────────
 
+  // Short labels for situation chips (compact horizontal rail)
+  _sitLabel(mood) {
+    const SHORT = {
+      'quiet-home': '🏠 自宅',
+      'noisy-out':  '🌆 外出中',
+      'transit':    '🚃 移動中',
+      'hotel':      '🏨 ホテル',
+      'pre-game':   '⚡ 勝負前',
+    };
+    return SHORT[mood.id] || mood.icon + ' ' + mood.label.slice(0, 5);
+  }
+
+  _selectMode(cat) {
+    if (cat === this._uiCat && !this.isPlaying) {
+      // Already on this mode and stopped — just ensure it's marked active
+      return;
+    }
+    const wasPlaying = this.isPlaying;
+    this._uiCat  = cat;
+    this._uiMood = 0;  // reset situation to first
+
+    // Update mode tab states
+    document.querySelectorAll('.mode-tab').forEach(t => {
+      const active = t.dataset.cat === cat;
+      t.classList.toggle('active', active);
+      t.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+
+    // Update sit chips + tagline + timer buttons
+    this._renderSitChips();
+    this._renderModeTagline();
+    this._renderTimerBtns(cat);
+
+    // Always show canvas animation for the selected mode (idle or playing)
+    if (this.animFrame) { cancelAnimationFrame(this.animFrame); this.animFrame = null; }
+    this._startVisuals(cat);
+
+    if (wasPlaying) {
+      // Crossfade: ramp out → stop → restart new mode
+      this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.45);
+      setTimeout(() => {
+        this._stopAll();
+        this._closeAudio();
+        this._startCategory(cat, this._uiMood);
+      }, 700);
+    }
+  }
+
+  _selectSituation(idx) {
+    const wasPlaying = this.isPlaying;
+    this._uiMood = idx;
+
+    document.querySelectorAll('.sit-chip').forEach(c => {
+      c.classList.toggle('active', +c.dataset.idx === idx);
+    });
+
+    if (wasPlaying) {
+      this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.45);
+      setTimeout(() => {
+        this._stopAll();
+        this._closeAudio();
+        this._startCategory(this._uiCat, idx);
+      }, 700);
+    }
+  }
+
+  _renderSitChips() {
+    const rail = document.getElementById('sit-rail');
+    rail.innerHTML = '';
+    const cat = this._uiCat;
+    MOOD_LABELS.forEach((mood, idx) => {
+      const btn = document.createElement('button');
+      btn.className   = 'sit-chip' + (idx === this._uiMood ? ' active' : '');
+      btn.dataset.idx = idx;
+      btn.dataset.cat = cat;
+      btn.textContent = this._sitLabel(mood);
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', idx === this._uiMood ? 'true' : 'false');
+      btn.addEventListener('click', () => this._selectSituation(idx));
+      rail.appendChild(btn);
+    });
+  }
+
+  _renderModeTagline() {
+    const TAGS = {
+      morning:   'α→β波でやさしく覚醒',
+      ready:     'β波でテンションアップ',
+      focus:     'α波でフロー状態へ',
+      meditation:'θ波で深い瞑想状態へ',
+      sleep:     'δ波で深い眠りへ',
+    };
+    const el = document.getElementById('mode-sub');
+    if (el) el.textContent = TAGS[this._uiCat] || '';
+  }
+
+  // ── Navigation (repurposed for single-screen) ─────────────────────────────
+
+  // Called when timer runs out — stop and reset to idle
   _showHome() {
     this._stopAll();
     this._closeAudio();
-
-    document.getElementById('player').classList.remove('active');
-    document.getElementById('mood').classList.remove('active');
-    document.getElementById('home').classList.add('active');
+    this._updatePlayBtn(false);
     document.getElementById('timer-display').textContent = '--:--';
     document.querySelectorAll('.timer-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.mins === '0'));
-    this._updatePlayBtn(false);
-  }
-
-  _showMood(cat) {
-    this.currentCat = cat;
-    const catNames = { meditation: '瞑想', sleep: '睡眠', focus: '集中', morning: '朝の目覚め', ready: '朝の支度' };
-    document.getElementById('mood-cat-title').textContent = catNames[cat];
-
-    const list = document.getElementById('mood-list');
-    list.innerHTML = '';
-    MOOD_LABELS.forEach((mood, idx) => {
-      const btn = document.createElement('button');
-      btn.className = 'mood-btn';
-      btn.innerHTML = `
-        <span class="mood-btn-icon">${mood.icon}</span>
-        <div class="mood-btn-text">
-          <div class="mood-btn-label">${mood.label}</div>
-          <div class="mood-btn-desc">${mood.desc}</div>
-        </div>
-        <span class="mood-btn-arrow">›</span>
-      `;
-      btn.addEventListener('click', () => this._showPlayer(cat, idx));
-      list.appendChild(btn);
-    });
-
-    document.getElementById('home').classList.remove('active');
-    document.getElementById('mood').classList.add('active');
-  }
-
-  _showPlayer(cat, moodId) {
-    const catNames = { meditation: '瞑想', sleep: '睡眠', focus: '集中', morning: '朝の目覚め', ready: '朝の支度' };
-    const mood = MOOD_LABELS[moodId];
-    document.getElementById('player-name').textContent = `${catNames[cat]} · ${mood.label}`;
-    document.getElementById('player-desc').textContent = mood.desc;
-
-    this._stopBgCanvas();
-    this._renderTimerBtns(cat);
-    document.getElementById('mood').classList.remove('active');
-    document.getElementById('player').classList.add('active');
-    this._startCategory(cat, moodId);
-  }
-
-  _backFromPlayer() {
-    const cat = this.currentCat;  // save before _stopAll nulls it
-    this._stopAll();
-    this._closeAudio();
-
-    this._startBgCanvas();
-    document.getElementById('player').classList.remove('active');
-    document.getElementById('timer-display').textContent = '--:--';
-    document.querySelectorAll('.timer-btn').forEach(b =>
-      b.classList.toggle('active', b.dataset.mins === '0'));
-    this._updatePlayBtn(false);
-
-    this._showMood(cat);
   }
 
   // ── UI helpers ────────────────────────────────────────────────────────────
 
   _updatePlayBtn(playing) {
-    document.getElementById('play-icon').textContent = playing ? '⏸' : '▶';
-    document.getElementById('play-text').textContent = playing ? '一時停止' : '再生';
-    document.getElementById('btn-play').classList.toggle('paused', !playing);
+    const btn  = document.getElementById('btn-play');
+    const icon = document.getElementById('play-icon');
+    const text = document.getElementById('play-text');
+    if (icon) icon.textContent = playing ? '⏸' : '▶';
+    if (text) text.textContent = playing ? '一時停止' : '再生';
+    if (btn)  btn.className    = 'play-btn' + (playing ? ' playing' : ' paused');
   }
 
   _initUI() {
-    document.querySelectorAll('.category-card').forEach(card =>
-      card.addEventListener('click', () => this._showMood(card.dataset.cat)));
-
-    document.getElementById('btn-mood-back').addEventListener('click', () => this._showHome());
-    document.getElementById('btn-back').addEventListener('click', () => this._backFromPlayer());
-
-    document.getElementById('btn-play').addEventListener('click', () => {
-      if (!this.ac) return;
-      this.isPlaying ? this._pause() : this._resume();
-    });
-
-    document.getElementById('master-vol').addEventListener('input', e => {
-      if (this.masterGain && this.isPlaying)
-        this.masterGain.gain.setTargetAtTime(+e.target.value / 100, this.ac.currentTime, 0.1);
-      this._savePrefs({ masterVol: e.target.value });  // ← 自動保存
-    });
-
-    // ── Restore master volume from last session ──
+    // ── Restore prefs ──
     const savedPrefs = this._loadPrefs();
     if (savedPrefs.masterVol != null) {
       document.getElementById('master-vol').value = savedPrefs.masterVol;
     }
 
-    // ── "前回の続きから" button ──
-    const resumeBtn = document.getElementById('btn-resume');
-    if (resumeBtn) {
-      this._refreshResumeBtn();
-      resumeBtn.addEventListener('click', () => {
-        const prefs = this._loadPrefs();
-        if (prefs.lastCat != null && prefs.lastMood != null) {
-          this._showPlayer(prefs.lastCat, prefs.lastMood);
-        }
-      });
+    // ── Initial mode / situation ──
+    this._uiCat  = savedPrefs.lastCat  || 'morning';
+    this._uiMood = savedPrefs.lastMood != null ? savedPrefs.lastMood : 0;
+
+    // Activate the right mode tab
+    document.querySelectorAll('.mode-tab').forEach(t => {
+      const active = t.dataset.cat === this._uiCat;
+      t.classList.toggle('active', active);
+      t.setAttribute('aria-selected', active ? 'true' : 'false');
+      t.addEventListener('click', () => this._selectMode(t.dataset.cat));
+    });
+
+    // Render situation chips + tagline + timer buttons for initial mode
+    this._renderSitChips();
+    this._renderModeTagline();
+    this._renderTimerBtns(this._uiCat);
+
+    // ── Play button ──
+    document.getElementById('btn-play').addEventListener('click', () => {
+      if (!this.ac || this.layers.length === 0) {
+        // First play (or after timer-stop): start fresh
+        this._startCategory(this._uiCat, this._uiMood);
+      } else if (this.isPlaying) {
+        this._pause();
+      } else {
+        this._resume();
+      }
+    });
+
+    // ── Master volume ──
+    document.getElementById('master-vol').addEventListener('input', e => {
+      if (this.masterGain && this.isPlaying)
+        this.masterGain.gain.setTargetAtTime(+e.target.value / 100, this.ac.currentTime, 0.1);
+      this._savePrefs({ masterVol: e.target.value });
+    });
+
+    // ── Layer panel placeholder ──
+    const container = document.getElementById('layers-container');
+    if (container && container.children.length === 0) {
+      const hint = document.createElement('p');
+      hint.className   = 'layer-panel-empty';
+      hint.textContent = '▶ 再生するとレイヤーが表示されます';
+      container.appendChild(hint);
     }
 
-    // timer buttons are rendered dynamically in _renderTimerBtns(cat)
+    // ── Show initial canvas animation for the selected mode ──
+    this._startVisuals(this._uiCat);
   }
 }
 
