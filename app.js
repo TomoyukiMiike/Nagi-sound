@@ -1485,10 +1485,44 @@ class HealingApp {
     this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
   }
 
+  // ── Stops only layer nodes/schedulers; keeps AudioContext alive ───────────
+  // Use this for mode/situation switches — avoids re-init and re-decode cost.
+
+  _stopLayersOnly() {
+    this.isPlaying = false;
+
+    this.schedulerTmrs.forEach(clearTimeout);
+    this.schedulerTmrs = [];
+
+    this._stopTimer();
+    if (this.animFrame) { cancelAnimationFrame(this.animFrame); this.animFrame = null; }
+
+    this.layers.forEach(l => {
+      l.nodes.forEach(n => { try { n.stop && n.stop(); n.disconnect(); } catch (_) {} });
+      try { l.gainNode.disconnect(); } catch (_) {}
+    });
+    this.layers = [];
+
+    this.currentCat  = null;
+    this.currentMood = null;
+    // AudioContext, masterGain, dryBus, reverbSend → kept alive intentionally
+  }
+
   // ── Category start ────────────────────────────────────────────────────────
 
-  async _startCategory(cat, moodId) {
-    this._initAudio();
+  async _startCategory(cat, moodId, fadeSec = 3.5) {
+    // Re-use existing AudioContext when switching modes; only init once.
+    if (!this.ac || this.ac.state === 'closed') {
+      this._initAudio();
+    } else {
+      // AudioContext is alive — restore masterGain to target volume immediately
+      const vol = +document.getElementById('master-vol').value / 100;
+      this.masterGain.gain.cancelScheduledValues(this.ac.currentTime);
+      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, this.ac.currentTime);
+      this.masterGain.gain.linearRampToValueAtTime(vol, this.ac.currentTime + 0.05);
+      if (this.ac.state === 'suspended') this.ac.resume();
+    }
+
     this.isPlaying   = true;
     this.currentCat  = cat;
     this.currentMood = moodId;
@@ -1496,9 +1530,10 @@ class HealingApp {
     const preset = PRESETS[cat][moodId];
     this.layers = [];
 
-    // Wait for all audio files to be decoded before building layers
+    // Wait for all audio files to be decoded before building layers.
+    // After the first play this resolves instantly (buffers cached).
     await this._soundsReady;
-    if (!this.isPlaying) return;  // user may have cancelled during load
+    if (!this.isPlaying) return;  // user switched again before decode finished
 
     preset.layers.forEach(def => {
       switch (def.type) {
@@ -1593,7 +1628,7 @@ class HealingApp {
       const vol = (savedVols && savedVols[idx] != null) ? savedVols[idx] : l.defaultVol;
       l.gainNode.gain.cancelScheduledValues(this.ac.currentTime);
       l.gainNode.gain.setValueAtTime(0, this.ac.currentTime);
-      l.gainNode.gain.linearRampToValueAtTime(vol, this.ac.currentTime + 3.5);
+      l.gainNode.gain.linearRampToValueAtTime(vol, this.ac.currentTime + fadeSec);
     });
 
     // Save last session & master volume
@@ -2146,42 +2181,36 @@ class HealingApp {
   }
 
   _selectMode(cat) {
-    if (cat === this._uiCat && !this.isPlaying) {
-      // Already on this mode and stopped — just ensure it's marked active
-      return;
-    }
+    if (cat === this._uiCat && !this.isPlaying) return;
+
     const wasPlaying = this.isPlaying;
     this._uiCat  = cat;
-    this._uiMood = 0;  // reset situation to first
+    this._uiMood = 0;
 
-    // Update mode tab states
+    // Update tab UI instantly
     document.querySelectorAll('.mode-tab').forEach(t => {
       const active = t.dataset.cat === cat;
       t.classList.toggle('active', active);
       t.setAttribute('aria-selected', active ? 'true' : 'false');
     });
-
-    // Update sit chips + tagline + timer buttons
     this._renderSitChips();
     this._renderModeTagline();
     this._renderTimerBtns(cat);
 
-    // Always show canvas animation for the selected mode (idle or playing)
+    // Canvas switches immediately (no audio dependency)
     if (this.animFrame) { cancelAnimationFrame(this.animFrame); this.animFrame = null; }
     this._startVisuals(cat);
 
     if (wasPlaying) {
-      // Crossfade: ramp out → stop → restart new mode
-      this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.45);
-      setTimeout(() => {
-        this._stopAll();
-        this._closeAudio();
-        this._startCategory(cat, this._uiMood);
-      }, 700);
+      // Short ramp-out, then swap layers — AudioContext stays alive, no re-decode
+      this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.12);
+      this._stopLayersOnly();
+      this._startCategory(cat, this._uiMood, 1.2);  // quick 1.2s fade-in
     }
   }
 
   _selectSituation(idx) {
+    if (idx === this._uiMood) return;
     const wasPlaying = this.isPlaying;
     this._uiMood = idx;
 
@@ -2190,12 +2219,9 @@ class HealingApp {
     });
 
     if (wasPlaying) {
-      this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.45);
-      setTimeout(() => {
-        this._stopAll();
-        this._closeAudio();
-        this._startCategory(this._uiCat, idx);
-      }, 700);
+      this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.12);
+      this._stopLayersOnly();
+      this._startCategory(this._uiCat, idx, 1.2);
     }
   }
 
@@ -2277,13 +2303,14 @@ class HealingApp {
 
     // ── Play button ──
     document.getElementById('btn-play').addEventListener('click', () => {
-      if (!this.ac || this.layers.length === 0) {
-        // First play (or after timer-stop): start fresh
-        this._startCategory(this._uiCat, this._uiMood);
-      } else if (this.isPlaying) {
+      if (this.isPlaying) {
         this._pause();
-      } else {
+      } else if (this.ac && this.ac.state !== 'closed' && this.layers.length > 0) {
+        // Paused mid-session — just resume
         this._resume();
+      } else {
+        // First play, or after timer fade-out (AC closed) — fresh start
+        this._startCategory(this._uiCat, this._uiMood);
       }
     });
 
