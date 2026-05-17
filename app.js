@@ -119,6 +119,14 @@ const SLEEP_MOODS = [
   { id: 'powernap', label: 'パワーナップ',        icon: '⚡', desc: '20分の最高の仮眠' },
 ];
 
+const PRESLEEP_MOODS = [
+  { id: 'bath',      label: '入浴中',       icon: '🛁', desc: 'お風呂でゆっくりと' },
+  { id: 'afterbath', label: '入浴後',        icon: '✨', desc: '湯上がりのリラックスタイム' },
+  { id: 'bedprep',   label: '就寝準備',      icon: '🌙', desc: '眠りに向けて体を整える' },
+  { id: 'reading',   label: '読書・スマホオフ', icon: '📖', desc: '静かな時間で心を落ち着かせる' },
+  { id: 'stretch',   label: 'ストレッチ',    icon: '🧘', desc: '体をほぐして眠りへ' },
+];
+
 const PRESETS = {
   meditation: [
     // 0: 家で静かに — 深い静寂: θ波 + 528Hz + 弦楽パッド + ハープ + ボウル
@@ -789,6 +797,7 @@ const TIMER_OPTIONS = {
   focus:      [{l:'なし',m:0},{l:'25分',m:25},{l:'50分',m:50},{l:'90分',m:90}],
   morning:    [{l:'なし',m:0},{l:'15分',m:15},{l:'30分',m:30},{l:'60分',m:60}],
   relax:      [{l:'なし',m:0},{l:'15分',m:15},{l:'30分',m:30},{l:'45分',m:45},{l:'60分',m:60}],
+  presleep: [{l:'なし',m:0},{l:'30分',m:30},{l:'45分',m:45},{l:'60分',m:60},{l:'90分',m:90}],
 };
 
 // A major (bright, uplifting): A3=220 C#4=277.18 E4=329.63 A4=440 C#5=554.37 E5=659.25
@@ -1235,6 +1244,212 @@ PRESETS.relax = [
             [null, 261.63, 329.63, null, 392],
           ], bpm:20, startDelay:6, vol:0.38 },
         { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦', vol:0.40 },
+      ]},
+    ]
+  },
+];
+
+// F major pentatonic: F3=174.61, A3=220, C4=261.63, F4=349.23, A4=440, C5=523.25
+PRESETS.presleep = [
+  // 0: 入浴中 — お風呂でのんびり: α波 + 川の流れ + 弦楽パッド + ハープ
+  {
+    breathe: [
+      { idx:0, min:0.40, max:0.56 },
+      { idx:1, min:0.46, max:0.64 },
+      { idx:2, min:0.42, max:0.60 },
+      { idx:3, min:0.28, max:0.48 },
+    ],
+    breatheInterval: 200,
+    presets: [
+      { name: 'ライト', layers: [
+        { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.50 },
+        { type:'stream',   name:'川の流れ',             icon:'💧', vol:0.58 },
+      ]},
+      { name: 'スタンダード', layers: [
+        { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.50 },
+        { type:'stream',   name:'川の流れ',             icon:'💧', vol:0.54 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.50 },
+        { type:'harp',     name:'ハープ',               icon:'🪕',
+          patterns:[
+            [174.61, null, 261.63, null, null],
+            [null, 220, null, 174.61, null],
+            [261.63, null, null, 220, null],
+            [null, 174.61, null, null, 349.23],
+          ], bpm:14, startDelay:6, vol:0.40 },
+      ]},
+      { name: 'ディープ', layers: [
+        { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.50 },
+        { type:'stream',   name:'川の流れ',             icon:'💧', vol:0.50 },
+        { type:'rain',     name:'雨音',                 icon:'🌧️', vol:0.26 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.52 },
+        { type:'harp',     name:'ハープ',               icon:'🪕',
+          patterns:[
+            [174.61, null, 261.63, null, null],
+            [null, 220, null, 174.61, null],
+            [261.63, null, null, 220, null],
+            [null, 174.61, null, null, 349.23],
+          ], bpm:14, startDelay:6, vol:0.40 },
+        { type:'bowl',     name:'チベタンボウル',         icon:'🔔', interval:28000, vol:0.42 },
+      ]},
+    ]
+  },
+  // 1: 入浴後 — 湯上がりのリラックス: α波 + 弦楽パッド + ハープ + ボウル
+  {
+    breathe: [
+      { idx:0, min:0.38, max:0.54 },
+      { idx:1, min:0.44, max:0.62 },
+      { idx:2, min:0.38, max:0.58 },
+      { idx:3, min:0.26, max:0.46 },
+    ],
+    breatheInterval: 210,
+    presets: [
+      { name: 'ライト', layers: [
+        { type:'binaural', name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.48 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.56 },
+      ]},
+      { name: 'スタンダード', layers: [
+        { type:'binaural', name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.48 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.56 },
+        { type:'harp',     name:'ハープ',               icon:'🪕',
+          patterns:[
+            [174.61, null, null, 261.63, null],
+            [null, 220, null, null, 174.61],
+            [261.63, null, 220, null, null],
+            [null, null, 174.61, 220, null],
+          ], bpm:13, startDelay:7, vol:0.38 },
+        { type:'bowl',     name:'チベタンボウル',         icon:'🔔', interval:26000, vol:0.48 },
+      ]},
+      { name: 'ディープ', layers: [
+        { type:'binaural',  name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.48 },
+        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.56 },
+        { type:'harp',      name:'ハープ',               icon:'🪕',
+          patterns:[
+            [174.61, null, null, 261.63, null],
+            [null, 220, null, null, 174.61],
+            [261.63, null, 220, null, null],
+            [null, null, 174.61, 220, null],
+          ], bpm:13, startDelay:7, vol:0.38 },
+        { type:'bowl',      name:'チベタンボウル',         icon:'🔔', interval:26000, vol:0.48 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ',    icon:'✦',  vol:0.44 },
+      ]},
+    ]
+  },
+  // 2: 就寝準備 — 眠りへの橋渡し: α→θ + ブラウン + 弦楽パッド + ハープ
+  {
+    breathe: [
+      { idx:0, min:0.42, max:0.58 },
+      { idx:1, min:0.34, max:0.54 },
+      { idx:2, min:0.40, max:0.58 },
+      { idx:3, min:0.24, max:0.44 },
+    ],
+    breatheInterval: 190,
+    presets: [
+      { name: 'ライト', layers: [
+        { type:'binaural', name:'バイノーラル α→θ',    icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2700, vol:0.52 },
+        { type:'noise',    name:'ブラウンノイズ',       icon:'🌫️', noiseType:'brown', vol:0.36 },
+      ]},
+      { name: 'スタンダード', layers: [
+        { type:'binaural', name:'バイノーラル α→θ',    icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2700, vol:0.52 },
+        { type:'noise',    name:'ブラウンノイズ',       icon:'🌫️', noiseType:'brown', vol:0.34 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.50 },
+        { type:'harp',     name:'ハープ',               icon:'🪕',
+          patterns:[
+            [174.61, null, 261.63, null, null],
+            [null, null, 220, null, 174.61],
+            [261.63, null, null, null, 220],
+            [null, 174.61, null, 261.63, null],
+          ], bpm:12, startDelay:8, vol:0.34 },
+      ]},
+      { name: 'ディープ', layers: [
+        { type:'binaural',  name:'バイノーラル α→θ',   icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2700, vol:0.52 },
+        { type:'noise',     name:'ブラウンノイズ',      icon:'🌫️', noiseType:'brown', vol:0.34 },
+        { type:'pad',       name:'弦楽器パッド',         icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.50 },
+        { type:'harp',      name:'ハープ',              icon:'🪕',
+          patterns:[
+            [174.61, null, 261.63, null, null],
+            [null, null, 220, null, 174.61],
+            [261.63, null, null, null, 220],
+            [null, 174.61, null, 261.63, null],
+          ], bpm:12, startDelay:8, vol:0.34 },
+        { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:24000, vol:0.44 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ',  icon:'✦',  vol:0.40 },
+      ]},
+    ]
+  },
+  // 3: 読書・スマホオフ — 焚き火と弦楽器: α波 + 焚き火 + オルガン + ハープ
+  {
+    breathe: [
+      { idx:0, min:0.36, max:0.52 },
+      { idx:1, min:0.40, max:0.58 },
+      { idx:2, min:0.36, max:0.56 },
+      { idx:3, min:0.24, max:0.44 },
+    ],
+    breatheInterval: 215,
+    presets: [
+      { name: 'ライト', layers: [
+        { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.46 },
+        { type:'fire',     name:'焚き火',               icon:'🔥', vol:0.58 },
+      ]},
+      { name: 'スタンダード', layers: [
+        { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.46 },
+        { type:'fire',     name:'焚き火',               icon:'🔥', vol:0.55 },
+        { type:'organ',    name:'オルガン',              icon:'🎹', baseFreq:87.31, vol:0.44 },
+        { type:'harp',     name:'ハープ',               icon:'🪕',
+          patterns:[
+            [174.61, null, 220, null, null],
+            [null, 261.63, null, 174.61, null],
+            [220, null, null, 261.63, null],
+            [null, 174.61, null, null, 220],
+          ], bpm:15, startDelay:6, vol:0.36 },
+      ]},
+      { name: 'ディープ', layers: [
+        { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.46 },
+        { type:'fire',     name:'焚き火',               icon:'🔥', vol:0.52 },
+        { type:'organ',    name:'オルガン',              icon:'🎹', baseFreq:87.31, vol:0.44 },
+        { type:'harp',     name:'ハープ',               icon:'🪕',
+          patterns:[
+            [174.61, null, 220, null, null],
+            [null, 261.63, null, 174.61, null],
+            [220, null, null, 261.63, null],
+            [null, 174.61, null, null, 220],
+          ], bpm:15, startDelay:6, vol:0.36 },
+        { type:'bowl',     name:'チベタンボウル',        icon:'🔔', interval:26000, vol:0.40 },
+      ]},
+    ]
+  },
+  // 4: ストレッチ — 体をほぐして眠りへ: α→θ + 川 + 弦楽パッド + ボウル
+  {
+    breathe: [
+      { idx:0, min:0.40, max:0.56 },
+      { idx:1, min:0.44, max:0.62 },
+      { idx:2, min:0.38, max:0.56 },
+      { idx:3, min:0.26, max:0.46 },
+    ],
+    breatheInterval: 185,
+    presets: [
+      { name: 'ライト', layers: [
+        { type:'binaural', name:'バイノーラル α→θ',    icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2400, vol:0.50 },
+        { type:'stream',   name:'川の流れ',             icon:'💧', vol:0.52 },
+      ]},
+      { name: 'スタンダード', layers: [
+        { type:'binaural', name:'バイノーラル α→θ',    icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2400, vol:0.50 },
+        { type:'stream',   name:'川の流れ',             icon:'💧', vol:0.48 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.52 },
+        { type:'bowl',     name:'チベタンボウル',        icon:'🔔', interval:22000, vol:0.50 },
+      ]},
+      { name: 'ディープ', layers: [
+        { type:'binaural',  name:'バイノーラル α→θ',   icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2400, vol:0.50 },
+        { type:'stream',    name:'川の流れ',            icon:'💧', vol:0.46 },
+        { type:'pad',       name:'弦楽器パッド',         icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.52 },
+        { type:'bowl',      name:'チベタンボウル',       icon:'🔔', interval:22000, vol:0.50 },
+        { type:'harp',      name:'ハープ',              icon:'🪕',
+          patterns:[
+            [174.61, null, 261.63, null, null],
+            [null, 220, null, 174.61, null],
+            [261.63, null, null, 220, null],
+            [null, 174.61, 220, null, null],
+          ], bpm:13, startDelay:7, vol:0.36 },
+        { type:'solfeggio', name:'528Hz ソルフェジオ',  icon:'✦',  vol:0.42 },
       ]},
     ]
   },
@@ -2545,6 +2760,7 @@ class HealingApp {
       }
       if      (cat === 'meditation') this._drawMeditation();
       else if (cat === 'sleep')      this._drawSleep();
+      else if (cat === 'presleep')   this._drawPresleep();
       else if (cat === 'morning')    this._drawMorning();
       else if (cat === 'relax')      this._drawRelax();
       else                           this._drawFocus();
@@ -2885,6 +3101,115 @@ class HealingApp {
     }
   }
 
+  // ── 睡眠前 — Warm Dusk / Bath (time-aware) ───────────────────────────────
+  _drawPresleep() {
+    const c = this.canvas, ctx = this.ctx;
+    if (c.width !== c.clientWidth || c.height !== c.clientHeight) {
+      c.width = c.clientWidth; c.height = c.clientHeight;
+      this._presleepMotes = null;
+    }
+    const W = c.width, H = c.height, t = this.t;
+
+    const hr    = this._getHour();
+    const eve   = Math.max(0, 1 - Math.abs(hr - 20.5) / 4.0);  // peaks at 8:30pm
+    const warm  = Math.max(0, 1 - Math.abs(hr - 19.0) / 3.5);  // warmth at 7pm
+
+    // ── Background: warm dusk → deep purple ──
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, `rgb(${22 + Math.round(warm*30)},${10 + Math.round(warm*12)},${35 + Math.round(eve*10)})`);
+    bg.addColorStop(1, `rgb(${9  + Math.round(warm*14)},${7  + Math.round(warm*6)}, ${20 + Math.round(eve*8)})`);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Warm central glow (bath heat / candlelight) ──
+    const gcx = W * 0.50, gcy = H * 0.58;
+    const gr   = Math.min(W, H) * (0.58 + 0.06 * Math.sin(t * 0.019));
+    const ga   = 0.11 + warm * 0.09 + 0.03 * Math.sin(t * 0.023);
+    const grd  = ctx.createRadialGradient(gcx, gcy, 0, gcx, gcy, gr);
+    grd.addColorStop(0,   `rgba(210,100,30,${ga})`);
+    grd.addColorStop(0.45,`rgba(160,50,70,${ga * 0.55})`);
+    grd.addColorStop(1,   `rgba(50,15,70,0)`);
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Soft aurora ribbons in warm tones ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    for (let r = 0; r < 3; r++) {
+      const y0  = H * (0.18 + r * 0.10 + 0.03 * Math.sin(t * 0.013 + r * 2.1));
+      const amp = H * (0.035 + 0.015 * Math.sin(t * 0.010 + r * 1.8));
+      const numP = 20;
+      const pts = [];
+      for (let i = 0; i <= numP; i++) {
+        pts.push([
+          (i / numP) * W,
+          y0 + amp * Math.sin(i * 0.5 + t * 0.008 + r * 0.9),
+        ]);
+      }
+      const hue = 18 + r * 22 + 12 * Math.sin(t * 0.006 + r);
+      const al  = (0.036 + warm * 0.032) * (1 + 0.25 * Math.sin(t * 0.017 + r));
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(pts[i][0], pts[i][1] + H * 0.055);
+      ctx.closePath();
+      ctx.fillStyle = `hsla(${hue},72%,62%,${al})`;
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+
+    // ── Steam wisps: soft radial-gradient blobs along a rising bezier ──
+    for (let w = 0; w < 3; w++) {
+      const ph   = t * 0.012 + w * 2.09;
+      const sx   = W * (0.28 + w * 0.22) + Math.sin(ph * 0.7) * W * 0.04;
+      const baseY = H * 0.86;
+      const cp1x = sx + Math.sin(ph + 0.5) * W * 0.05;
+      const cp1y = baseY - H * 0.22;
+      const cp2x = sx + Math.sin(ph + 1.2) * W * 0.07;
+      const cp2y = baseY - H * 0.46;
+      const ex   = sx + Math.sin(ph + 0.3) * W * 0.03;
+      const ey   = baseY - H * 0.66;
+      const steps = 10;
+      for (let s = 0; s < steps; s++) {
+        const tn  = s / (steps - 1);
+        const mt  = 1 - tn;
+        const bx  = mt*mt*mt*sx + 3*mt*mt*tn*cp1x + 3*mt*tn*tn*cp2x + tn*tn*tn*ex;
+        const by  = mt*mt*mt*baseY + 3*mt*mt*tn*cp1y + 3*mt*tn*tn*cp2y + tn*tn*tn*ey;
+        const rad = 9 + tn * 18;
+        const al  = 0.038 * (1 - tn) * (0.7 + 0.3 * Math.sin(ph * 2.5));
+        const sg  = ctx.createRadialGradient(bx, by, 0, bx, by, rad);
+        sg.addColorStop(0,  `rgba(215,175,145,${al})`);
+        sg.addColorStop(1,  `rgba(215,175,145,0)`);
+        ctx.fillStyle = sg;
+        ctx.fillRect(bx - rad, by - rad, rad * 2, rad * 2);
+      }
+    }
+
+    // ── Slow warm motes (like floating candle sparks) ──
+    if (!this._presleepMotes) {
+      this._presleepMotes = Array.from({ length: 26 }, () => ({
+        x: Math.random(), y: Math.random(),
+        r: 0.7 + Math.random() * 1.5,
+        vx: (Math.random() - 0.5) * 0.00008,
+        vy: -(0.00005 + Math.random() * 0.00007),
+        ph: Math.random() * Math.PI * 2,
+      }));
+    }
+    this._presleepMotes.forEach(m => {
+      m.x = (m.x + m.vx + 1) % 1;
+      m.y += m.vy;
+      if (m.y < 0) { m.y = 1.0; m.x = Math.random(); }
+      const al = 0.22 + 0.14 * Math.sin(t * 0.016 + m.ph);
+      ctx.beginPath();
+      ctx.arc(m.x * W, m.y * H, m.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(235,165,90,${al})`;
+      ctx.fill();
+    });
+
+    this.t++;
+  }
+
   // ── 睡眠 — Aurora Night (time-aware) ─────────────────────────────────────
   _drawSleep() {
     const { ctx, canvas, t } = this;
@@ -3215,7 +3540,7 @@ class HealingApp {
     const rail = document.getElementById('sit-rail');
     rail.innerHTML = '';
     const cat = this._uiCat;
-    const moods = (cat === 'sleep') ? SLEEP_MOODS : MOOD_LABELS;
+    const moods = cat === 'sleep' ? SLEEP_MOODS : cat === 'presleep' ? PRESLEEP_MOODS : MOOD_LABELS;
     moods.forEach((mood, idx) => {
       const btn = document.createElement('button');
       btn.className   = 'sit-chip' + (idx === this._uiMood ? ' active' : '');
@@ -3236,6 +3561,7 @@ class HealingApp {
       focus:     'α波でフロー状態へ',
       meditation:'θ波で深い瞑想状態へ',
       sleep:     'δ波で深い眠りへ',
+      presleep: 'お風呂から眠りへ、体と心をほどいていく',
     };
     const el = document.getElementById('mode-sub');
     if (el) el.textContent = TAGS[this._uiCat] || '';

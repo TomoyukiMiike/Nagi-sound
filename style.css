@@ -20,6 +20,7 @@
   --c-focus:      #38bdf8;
   --c-meditation: #e879f9;
   --c-sleep:      #818cf8;
+  --c-presleep:   #fb923c;
 }
 
 html, body {
@@ -138,6 +139,7 @@ html, body {
 .mode-tab[data-cat="focus"].active       { border-color: rgba(56,189,248,0.38);  background: rgba(56,189,248,0.08);  color: #38bdf8; }
 .mode-tab[data-cat="meditation"].active  { border-color: rgba(232,121,249,0.38); background: rgba(232,121,249,0.08); color: #e879f9; }
 .mode-tab[data-cat="sleep"].active       { border-color: rgba(129,140,248,0.38); background: rgba(129,140,248,0.08); color: #818cf8; }
+.mode-tab[data-cat="presleep"].active    { border-color: rgba(251,146,60,0.38); background: rgba(251,146,60,0.08); color: #fb923c; }
 
 .mode-tab.active .mode-tab-label { color: inherit; }
 
@@ -204,6 +206,7 @@ html, body {
 .sit-chip.active[data-cat="focus"]      { background: rgba(56,189,248,0.10);  border-color: rgba(56,189,248,0.32);  color: #bae6fd; }
 .sit-chip.active[data-cat="meditation"] { background: rgba(232,121,249,0.10); border-color: rgba(232,121,249,0.32); color: #f5d0fe; }
 .sit-chip.active[data-cat="sleep"]      { background: rgba(129,140,248,0.10); border-color: rgba(129,140,248,0.32); color: #c7d2fe; }
+.sit-chip.active[data-cat="presleep"]   { background: rgba(251,146,60,0.10); border-color: rgba(251,146,60,0.32); color: #fed7aa; }
 
 /* ── ④b Preset selector ── */
 .preset-row {
