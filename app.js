@@ -772,43 +772,74 @@ class HealingApp {
     const ctx = this.bgCtx;
     if (c.width !== c.clientWidth || c.height !== c.clientHeight) {
       c.width = c.clientWidth; c.height = c.clientHeight;
+      // Re-seed stars on resize
+      this._bgStars = null;
     }
     const W = c.width, H = c.height, t = this.bgT;
 
-    ctx.fillStyle = '#050912';
+    // ── Base fill ──
+    ctx.fillStyle = '#040810';
     ctx.fillRect(0, 0, W, H);
 
-    // Slow-drifting nebula blobs
+    // ── Aurora nebula blobs (slow drift, richer colors) ──
     const blobs = [
-      { cx:0.25, cy:0.35, r:0.60, rgb:[55,80,200],   a:0.048, sx:0.13, sy:0.10, sp:0.00022, ph:0.0 },
-      { cx:0.75, cy:0.55, r:0.52, rgb:[90,50,180],   a:0.036, sx:0.11, sy:0.12, sp:0.00016, ph:2.1 },
-      { cx:0.50, cy:0.12, r:0.46, rgb:[20,130,190],  a:0.026, sx:0.10, sy:0.09, sp:0.00019, ph:4.3 },
-      { cx:0.15, cy:0.78, r:0.42, rgb:[70,50,190],   a:0.032, sx:0.08, sy:0.11, sp:0.00021, ph:1.2 },
-      { cx:0.85, cy:0.20, r:0.38, rgb:[30,100,180],  a:0.020, sx:0.09, sy:0.08, sp:0.00017, ph:3.5 },
+      { cx:0.20, cy:0.30, r:0.68, rgb:[80, 100,230],  a:0.055, sx:0.12, sy:0.09, sp:0.00018, ph:0.0 },
+      { cx:0.80, cy:0.60, r:0.58, rgb:[140, 60,200],  a:0.042, sx:0.10, sy:0.11, sp:0.00013, ph:2.1 },
+      { cx:0.50, cy:0.10, r:0.50, rgb:[ 30,150,210],  a:0.030, sx:0.09, sy:0.08, sp:0.00015, ph:4.3 },
+      { cx:0.10, cy:0.80, r:0.44, rgb:[ 90, 70,210],  a:0.038, sx:0.07, sy:0.10, sp:0.00017, ph:1.2 },
+      { cx:0.88, cy:0.18, r:0.40, rgb:[ 40,120,200],  a:0.024, sx:0.08, sy:0.07, sp:0.00014, ph:3.5 },
+      { cx:0.55, cy:0.85, r:0.36, rgb:[160, 80,240],  a:0.028, sx:0.11, sy:0.06, sp:0.00020, ph:5.1 },
     ];
 
     blobs.forEach(b => {
-      const x  = (b.cx + Math.sin(t * b.sp + b.ph) * b.sx) * W;
-      const y  = (b.cy + Math.cos(t * b.sp * 0.71 + b.ph) * b.sy) * H;
-      const r  = b.r * Math.max(W, H);
-      const [r0,g0,bl0] = b.rgb;
-      const gr = ctx.createRadialGradient(x, y, 0, x, y, r);
-      gr.addColorStop(0,   `rgba(${r0},${g0},${bl0},${b.a})`);
-      gr.addColorStop(0.45,`rgba(${r0},${g0},${bl0},${b.a * 0.35})`);
-      gr.addColorStop(1,   `rgba(${r0},${g0},${bl0},0)`);
+      const bx = (b.cx + Math.sin(t * b.sp + b.ph) * b.sx) * W;
+      const by = (b.cy + Math.cos(t * b.sp * 0.71 + b.ph) * b.sy) * H;
+      const br = b.r * Math.max(W, H);
+      const [r0, g0, bl0] = b.rgb;
+      const gr = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+      gr.addColorStop(0,    `rgba(${r0},${g0},${bl0},${b.a})`);
+      gr.addColorStop(0.40, `rgba(${r0},${g0},${bl0},${(b.a * 0.38).toFixed(3)})`);
+      gr.addColorStop(1,    `rgba(${r0},${g0},${bl0},0)`);
       ctx.fillStyle = gr;
       ctx.fillRect(0, 0, W, H);
     });
 
-    // Subtle star field
-    for (let i = 0; i < 42; i++) {
-      const sx = ((Math.sin(i * 127.1) + 1) / 2) * W;
-      const sy = ((Math.sin(i * 311.7) + 1) / 2) * H;
-      const tw = 0.05 + 0.22 * Math.abs(Math.sin(t * 0.00035 + i * 2.3));
-      ctx.fillStyle = `rgba(170,190,230,${tw})`;
+    // ── Star field (seeded once, twinkle over time) ──
+    if (!this._bgStars) {
+      this._bgStars = Array.from({ length: 72 }, (_, i) => ({
+        x: ((Math.sin(i * 127.1 + 3) + 1) / 2) * W,
+        y: ((Math.sin(i * 311.7 + 1) + 1) / 2) * H,
+        r: 0.28 + 0.90 * Math.abs(Math.sin(i * 0.87)),
+        phase: i * 2.3,
+        speed: 0.00028 + Math.random() * 0.00040,
+      }));
+    }
+    this._bgStars.forEach(s => {
+      const tw = 0.06 + 0.28 * Math.abs(Math.sin(t * s.speed + s.phase));
+      ctx.fillStyle = `rgba(180,200,240,${tw.toFixed(3)})`;
       ctx.beginPath();
-      ctx.arc(sx, sy, 0.3 + 0.85 * Math.abs(Math.sin(i * 0.87)), 0, Math.PI * 2);
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
       ctx.fill();
+    });
+
+    // ── Occasional shooting star ──
+    if (!this._shootT) this._shootT = 0;
+    this._shootT++;
+    if (this._shootT % 420 === 0) {
+      const sx = Math.random() * W;
+      const sy = Math.random() * H * 0.5;
+      const len = 60 + Math.random() * 80;
+      const ang = Math.PI * 0.18 + Math.random() * 0.1;
+      const gr2 = ctx.createLinearGradient(sx, sy, sx + Math.cos(ang)*len, sy + Math.sin(ang)*len);
+      gr2.addColorStop(0, 'rgba(200,220,255,0)');
+      gr2.addColorStop(0.4, 'rgba(200,220,255,0.55)');
+      gr2.addColorStop(1, 'rgba(200,220,255,0)');
+      ctx.strokeStyle = gr2;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + Math.cos(ang)*len, sy + Math.sin(ang)*len);
+      ctx.stroke();
     }
 
     this.bgT += 1;
