@@ -1871,297 +1871,377 @@ class HealingApp {
     render();
   }
 
-  _drawMeditation() {
+  // ── 朝の目覚め — Aurora Dawn ─────────────────────────────────────────────
+  // 暁のオーロラリボン（水平）+ 地平線グロー + 黄金の光の粒
+  _drawMorning() {
     const { ctx, canvas, t } = this;
     const W = canvas.width, H = canvas.height;
-    const cx = W / 2, cy = H * 0.40;
+    const cx = W * 0.5;
 
-    ctx.fillStyle = '#070412'; ctx.fillRect(0, 0, W, H);
+    // Sky: deep indigo → twilight violet → dawn rose → amber horizon
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0,    '#070516');
+    sky.addColorStop(0.38, '#1a0830');
+    sky.addColorStop(0.65, '#3d1040');
+    sky.addColorStop(0.82, '#7a2018');
+    sky.addColorStop(1,    '#b84010');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
 
-    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.65);
-    bg.addColorStop(0, 'rgba(109,40,217,0.22)');
-    bg.addColorStop(0.55, 'rgba(79,70,229,0.08)');
-    bg.addColorStop(1, 'transparent');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    // Aurora ribbons — filled sine-wave polygons with vertical gradient
+    const bands = [
+      { y: 0.20, amp: 0.055, freq: 2.1, spd: 0.18, rgb: [70,210,240],   a: 0.30, h: 0.16 },
+      { y: 0.32, amp: 0.042, freq: 1.65,spd: 0.13, rgb: [200,100,210],  a: 0.24, h: 0.13 },
+      { y: 0.12, amp: 0.032, freq: 2.9, spd: 0.23, rgb: [255,190, 80],  a: 0.18, h: 0.10 },
+    ];
+    bands.forEach(b => {
+      const yM = b.y * H, hH = b.h * H;
+      const [r, g, bl] = b.rgb;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 4) {
+        const w = Math.sin(x / W * Math.PI * b.freq + t * b.spd) * b.amp * H;
+        x === 0 ? ctx.moveTo(x, yM + w - hH) : ctx.lineTo(x, yM + w - hH);
+      }
+      for (let x = W; x >= 0; x -= 4) {
+        const w = Math.sin(x / W * Math.PI * b.freq + t * b.spd) * b.amp * H;
+        ctx.lineTo(x, yM + w + hH);
+      }
+      ctx.closePath();
+      const gr = ctx.createLinearGradient(0, yM - hH, 0, yM + hH * 1.5);
+      gr.addColorStop(0,    `rgba(${r},${g},${bl},0)`);
+      gr.addColorStop(0.30, `rgba(${r},${g},${bl},${b.a})`);
+      gr.addColorStop(0.65, `rgba(${r},${g},${bl},${(b.a * 0.55).toFixed(3)})`);
+      gr.addColorStop(1,    `rgba(${r},${g},${bl},0)`);
+      ctx.fillStyle = gr; ctx.fill();
+    });
 
-    const ph = (t % 16) / 16;
-    let ratio, label;
-    if      (ph < 0.25) { ratio = ph / 0.25;              label = '吸　う'; }
-    else if (ph < 0.5)  { ratio = 1;                      label = '保　つ'; }
-    else if (ph < 0.75) { ratio = 1 - (ph - 0.5) / 0.25; label = '吐　く'; }
-    else                { ratio = 0;                      label = '　　…'; }
+    // Horizon glow
+    const hor = ctx.createRadialGradient(cx, H, 0, cx, H, H * 0.80);
+    hor.addColorStop(0,    'rgba(210,90,30,0.42)');
+    hor.addColorStop(0.38, 'rgba(170,45,70,0.16)');
+    hor.addColorStop(1,    'rgba(0,0,0,0)');
+    ctx.fillStyle = hor; ctx.fillRect(0, 0, W, H);
 
-    const minR = Math.min(W, H) * 0.10;
-    const maxR = Math.min(W, H) * 0.26;
-    const r    = minR + (maxR - minR) * ratio;
+    // Sun cresting the horizon (slowly rises)
+    const sunR = Math.min(W, H) * 0.068;
+    const sunY = H * 0.98 - sunR * (0.5 + 0.35 * Math.abs(Math.sin(t * 0.006)));
+    const sunG = ctx.createRadialGradient(cx, sunY, 0, cx, sunY, sunR * 2.8);
+    sunG.addColorStop(0,   'rgba(255,245,180,0.96)');
+    sunG.addColorStop(0.35,'rgba(255,175,50, 0.55)');
+    sunG.addColorStop(1,   'rgba(255,110,20, 0)');
+    ctx.fillStyle = sunG; ctx.beginPath(); ctx.arc(cx, sunY, sunR * 2.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,252,220,0.95)';
+    ctx.beginPath(); ctx.arc(cx, sunY, sunR, 0, Math.PI * 2); ctx.fill();
 
-    for (let i = 3; i >= 1; i--) {
-      const g = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * (1 + i * 0.55));
-      g.addColorStop(0, `rgba(139,92,246,${0.12/i})`);
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(cx, cy, r * (1 + i * 0.55), 0, Math.PI * 2); ctx.fill();
-    }
-
-    const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    cg.addColorStop(0, 'rgba(216,180,254,0.55)');
-    cg.addColorStop(0.6, 'rgba(139,92,246,0.25)');
-    cg.addColorStop(1, 'rgba(79,70,229,0.04)');
-    ctx.fillStyle = cg;
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = `rgba(216,180,254,${0.3 + ratio * 0.35})`;
-    ctx.lineWidth = 1.5; ctx.stroke();
-
-    ctx.fillStyle = 'rgba(255,255,255,0.88)';
-    ctx.font = `${Math.round(Math.min(W,H) * 0.042)}px -apple-system, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(label, cx, cy);
-
-    for (let i = 0; i < 30; i++) {
-      const s  = i * 137.51;
-      const px = cx + Math.cos(s) * W * 0.34 + Math.sin(t * 0.25 + s * 0.9) * 20;
-      const py = cy + Math.sin(s * 0.7) * H * 0.28 + Math.cos(t * 0.18 + s * 1.2) * 16;
-      const a  = 0.2 + 0.5 * Math.abs(Math.sin(t * 0.4 + s));
-      ctx.fillStyle = `rgba(221,214,254,${a})`;
-      ctx.beginPath(); ctx.arc(px, py, 0.8 + 2 * Math.abs(Math.sin(s * 0.3)), 0, Math.PI * 2); ctx.fill();
+    // Drifting golden motes (float upward)
+    for (let i = 0; i < 50; i++) {
+      const s  = i * 137.508;
+      const px = ((Math.sin(s * 0.17) + 1) / 2) * W;
+      const vy = t * 0.00055 * (0.6 + 0.4 * Math.sin(s * 0.3));
+      const py = ((((Math.sin(s * 0.11) + 1) / 2) - vy) % 1 + 1) % 1 * H;
+      const al = (0.14 + 0.55 * Math.abs(Math.sin(t * 0.38 + s))).toFixed(2);
+      const rr = 0.5 + 1.6 * Math.abs(Math.sin(s * 0.44));
+      ctx.fillStyle = `rgba(255,210,90,${al})`;
+      ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI * 2); ctx.fill();
     }
   }
 
+  // ── 朝の支度 — Solar Storm ───────────────────────────────────────────────
+  // 膨張する光の波紋 + 中心コア + スパイラル粒子アーム
+  _drawReady() {
+    const { ctx, canvas, t } = this;
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H * 0.42;
+    const U  = Math.min(W, H);
+
+    ctx.fillStyle = '#090600'; ctx.fillRect(0, 0, W, H);
+    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, U * 0.65);
+    bg.addColorStop(0,   'rgba(200,90,10,0.20)');
+    bg.addColorStop(0.5, 'rgba(160,50,5,0.07)');
+    bg.addColorStop(1,   'transparent');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    // Expanding pulse rings (5 rings cycling continuously)
+    for (let i = 0; i < 5; i++) {
+      const prog  = ((t * 0.20 + i * 0.2) % 1);
+      const rRing = prog * U * 0.50;
+      const al    = (1 - prog) * 0.18;
+      ctx.beginPath(); ctx.arc(cx, cy, rRing, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(251,146,60,${al.toFixed(3)})`;
+      ctx.lineWidth = 1.4 * (1 - prog * 0.6); ctx.stroke();
+    }
+
+    // Central corona + core
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2.0);
+    const cR    = U * (0.038 + 0.016 * pulse);
+    const corona = ctx.createRadialGradient(cx, cy, 0, cx, cy, cR * (5 + 2 * pulse));
+    corona.addColorStop(0,   `rgba(255,235,140,${0.60 + 0.20 * pulse})`);
+    corona.addColorStop(0.25,`rgba(251,146,60, ${0.28 + 0.12 * pulse})`);
+    corona.addColorStop(1,   'rgba(217,70,10,0)');
+    ctx.fillStyle = corona;
+    ctx.beginPath(); ctx.arc(cx, cy, cR * (5 + 2 * pulse), 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(255,250,210,${0.90 + 0.08 * pulse})`;
+    ctx.beginPath(); ctx.arc(cx, cy, cR, 0, Math.PI * 2); ctx.fill();
+
+    // Spiral particle arms (3 arms × 10 particles)
+    for (let arm = 0; arm < 3; arm++) {
+      const armBase = (arm / 3) * Math.PI * 2 + t * 0.60;
+      for (let p = 0; p < 10; p++) {
+        const prog = p / 10;
+        const ang  = armBase + prog * Math.PI * 1.5;
+        const dist = U * (0.08 + prog * 0.32);
+        const px   = cx + Math.cos(ang) * dist;
+        const py   = cy + Math.sin(ang) * dist;
+        const al   = ((1 - prog) * (0.55 + 0.35 * Math.abs(Math.sin(t * 1.1 + p)))).toFixed(2);
+        const rp   = (1 - prog * 0.65) * 2.8;
+        ctx.fillStyle = `rgba(251,191,36,${al})`;
+        ctx.beginPath(); ctx.arc(px, py, rp, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // Ambient spark field
+    for (let i = 0; i < 28; i++) {
+      const s  = i * 137.508;
+      const a  = s + t * (0.26 + 0.16 * Math.sin(s * 0.1));
+      const d  = U * (0.24 + 0.22 * Math.abs(Math.sin(s * 0.31)));
+      const px = cx + Math.cos(a) * d;
+      const py = cy + Math.sin(a) * d * 0.88;
+      const al = (0.08 + 0.38 * Math.abs(Math.sin(t * 0.75 + s))).toFixed(2);
+      ctx.fillStyle = `rgba(251,191,36,${al})`;
+      ctx.beginPath(); ctx.arc(px, py, 0.8 + 1.4 * Math.abs(Math.sin(s * 0.5)), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ── 集中 — Lissajous Flow ────────────────────────────────────────────────
+  // パラメトリック曲線（リサジュー）が緩やかに変形する — フロー状態の可視化
+  _drawFocus() {
+    const { ctx, canvas, t } = this;
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H * 0.44;
+    const U  = Math.min(W, H);
+
+    ctx.fillStyle = '#010c0a'; ctx.fillRect(0, 0, W, H);
+    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, U * 0.52);
+    bg.addColorStop(0,   `rgba(0,130,95,${0.10 + 0.04 * Math.sin(t * 0.5)})`);
+    bg.addColorStop(1,   'transparent');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    // Lissajous figure — a:b ratio morphs slowly (3:2 → 5:3)
+    const A    = U * 0.28, B = U * 0.22;
+    const fa   = 3;
+    const fb   = 2 + 0.08 * Math.sin(t * 0.028);   // gently morphs
+    const dphi = t * 0.055;                          // slow phase drift
+
+    const STEPS = 220;
+    for (let i = 0; i < STEPS; i++) {
+      const θ   = (i / STEPS) * Math.PI * 2;
+      const x   = cx + A * Math.sin(fa * θ + dphi);
+      const y   = cy + B * Math.sin(fb * θ);
+      // Hue shifts teal → cyan → emerald along the curve
+      const hue = 155 + 45 * ((i / STEPS));
+      const al  = (0.28 + 0.52 * Math.abs(Math.sin(θ * 3.1 + t * 0.7))).toFixed(2);
+      const rr  = 1.2 + 1.5 * Math.abs(Math.sin(θ * 2.2 + t * 0.4));
+      ctx.fillStyle = `hsla(${hue | 0},78%,62%,${al})`;
+      ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Three moving highlight glows tracing the curve
+    for (let k = 0; k < 3; k++) {
+      const θ = (t * 0.72 + k * Math.PI * 2 / 3) % (Math.PI * 2);
+      const x = cx + A * Math.sin(fa * θ + dphi);
+      const y = cy + B * Math.sin(fb * θ);
+      const dotG = ctx.createRadialGradient(x, y, 0, x, y, U * 0.055);
+      dotG.addColorStop(0,   'rgba(110,240,185,0.88)');
+      dotG.addColorStop(0.4, 'rgba(52, 211,153,0.35)');
+      dotG.addColorStop(1,   'transparent');
+      ctx.fillStyle = dotG; ctx.beginPath(); ctx.arc(x, y, U * 0.055, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(210,255,235,0.95)';
+      ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Faint sacred geometry backdrop (Flower of Life fragment)
+    const rot = t * 0.022;
+    const R   = U * 0.19;
+    ctx.lineWidth = 0.7;
+    ctx.strokeStyle = 'rgba(52,211,153,0.07)';
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + rot;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * R, cy + Math.sin(a) * R, R, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+
+    // Subtle grid
+    ctx.strokeStyle = 'rgba(52,211,153,0.035)'; ctx.lineWidth = 0.5;
+    const gStep = U * 0.088;
+    for (let x = cx % gStep; x < W; x += gStep) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = cy % gStep; y < H; y += gStep) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  }
+
+  // ── 瞑想 — Breathing Mandala ─────────────────────────────────────────────
+  // 呼吸マンダラ: 多層リプル + フラワーペタル + 呼吸インジケーター
+  _drawMeditation() {
+    const { ctx, canvas, t } = this;
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H * 0.42;
+    const U  = Math.min(W, H);
+
+    ctx.fillStyle = '#060212'; ctx.fillRect(0, 0, W, H);
+    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, U * 0.60);
+    bg.addColorStop(0,   'rgba(100,28,140,0.26)');
+    bg.addColorStop(0.55,'rgba(70,20,110,0.10)');
+    bg.addColorStop(1,   'transparent');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    // Breath cycle (4-4-4-4 pattern: in / hold / out / rest)
+    const ph = (t % 16) / 16;
+    let ratio, label;
+    if      (ph < 0.25) { ratio = ph / 0.25;              label = '吸　う'; }
+    else if (ph < 0.50) { ratio = 1;                      label = '保　つ'; }
+    else if (ph < 0.75) { ratio = 1 - (ph - 0.50) / 0.25; label = '吐　く'; }
+    else                { ratio = 0;                      label = '　　…'; }
+    const cR = U * (0.09 + 0.17 * ratio);  // core radius breathes
+
+    // Ripple rings (6 rings, offset timing — like ripples from a stone)
+    for (let i = 0; i < 6; i++) {
+      const prog = ((t * 0.16 + i / 6) % 1);
+      const rRip = cR + prog * U * 0.44;
+      const al   = (1 - prog) * 0.22;
+      if (al < 0.008) continue;
+      ctx.beginPath(); ctx.arc(cx, cy, rRip, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(192,105,255,${al.toFixed(3)})`;
+      ctx.lineWidth = 1.4 * (1 - prog * 0.5); ctx.stroke();
+    }
+
+    // Outer petal ring (12 petals, slowly rotating)
+    const rotOuter = t * 0.020;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + rotOuter;
+      const pr = cR * 0.72, pd = cR * 0.80;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * pd, cy + Math.sin(a) * pd, pr, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(180,100,255,${(0.06 + ratio * 0.05).toFixed(3)})`;
+      ctx.lineWidth = 0.7; ctx.stroke();
+    }
+    // Inner petal ring (6 petals, counter-rotating)
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 - rotOuter * 1.4;
+      const pr = cR * 0.88, pd = cR * 0.92;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * pd, cy + Math.sin(a) * pd, pr, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(216,150,255,${(0.10 + ratio * 0.08).toFixed(3)})`;
+      ctx.lineWidth = 0.8; ctx.stroke();
+    }
+
+    // Core glow layers
+    for (let i = 3; i >= 1; i--) {
+      const g = ctx.createRadialGradient(cx, cy, cR * 0.6, cx, cy, cR * (1 + i * 0.60));
+      g.addColorStop(0, `rgba(200,140,255,${(0.13 / i).toFixed(3)})`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, cR * (1 + i * 0.60), 0, Math.PI * 2); ctx.fill();
+    }
+    const cG = ctx.createRadialGradient(cx, cy, 0, cx, cy, cR);
+    cG.addColorStop(0,    'rgba(245,220,255,0.62)');
+    cG.addColorStop(0.55, 'rgba(160, 80,255,0.28)');
+    cG.addColorStop(1,    'rgba(100, 40,220,0.04)');
+    ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(cx, cy, cR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = `rgba(216,180,254,${(0.32 + ratio * 0.38).toFixed(3)})`;
+    ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, cR, 0, Math.PI * 2); ctx.stroke();
+
+    // Breath label
+    ctx.fillStyle = 'rgba(255,255,255,0.86)';
+    ctx.font = `${(U * 0.042) | 0}px -apple-system, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, cx, cy);
+
+    // Orbiting particles
+    for (let i = 0; i < 36; i++) {
+      const s  = i * 137.508;
+      const a  = s + t * (0.055 + 0.035 * Math.sin(s * 0.2));
+      const d  = U * (0.30 + 0.14 * Math.abs(Math.sin(s * 0.4)));
+      const px = cx + Math.cos(a) * d;
+      const py = cy + Math.sin(a) * d * 0.86;
+      const al = (0.10 + 0.48 * Math.abs(Math.sin(t * 0.26 + s))).toFixed(2);
+      ctx.fillStyle = `rgba(220,195,255,${al})`;
+      ctx.beginPath(); ctx.arc(px, py, 0.7 + 1.9 * Math.abs(Math.sin(s * 0.3)), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ── 睡眠 — Aurora Night ──────────────────────────────────────────────────
+  // 縦のオーロラカーテン + 星野 + 月 + 波紋
   _drawSleep() {
     const { ctx, canvas, t } = this;
     const W = canvas.width, H = canvas.height;
 
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#010a18'); bg.addColorStop(0.5, '#040d1e'); bg.addColorStop(1, '#071428');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    // Deep space gradient
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0,   '#010710');
+    sky.addColorStop(0.45,'#030c1c');
+    sky.addColorStop(0.85,'#050f22');
+    sky.addColorStop(1,   '#040d1a');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
 
-    const spulse = 0.5 + 0.5 * Math.sin(t * 0.8);
-    const cx = W * 0.5, cy = H * 0.4;
-    const sr = Math.min(W, H) * (0.08 + 0.04 * spulse);
-    const sG = ctx.createRadialGradient(cx, cy, 0, cx, cy, sr * 3);
-    sG.addColorStop(0, `rgba(100, 210, 200, ${0.18 + 0.08 * spulse})`);
-    sG.addColorStop(1, 'transparent');
-    ctx.fillStyle = sG; ctx.beginPath(); ctx.arc(cx, cy, sr * 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = `rgba(150, 240, 230, ${0.5 + 0.3 * spulse})`;
-    ctx.beginPath(); ctx.arc(cx, cy, sr, 0, Math.PI * 2); ctx.fill();
-
-    ctx.save(); ctx.globalAlpha = 0.10;
-    [[30,64,175],[4,100,80],[79,70,229]].forEach(([r,g,b], i) => {
-      const wv = H * 0.28;
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.beginPath(); ctx.moveTo(0, 0);
-      for (let x = 0; x <= W; x += 4)
-        ctx.lineTo(x, wv * 0.5 * (1 + Math.sin(x / W * Math.PI * 3 + t * 0.04 + i * 2.1)));
-      ctx.lineTo(W, 0); ctx.closePath(); ctx.fill();
-    });
-    ctx.restore();
-
-    for (let i = 0; i < 90; i++) {
-      const s  = i * 137.51;
-      const sx = ((Math.sin(s * 0.11) + 1) / 2) * W;
-      const sy = ((Math.sin(s * 0.073) + 1) / 2) * H * 0.72;
-      const tw = 0.25 + 0.75 * Math.abs(Math.sin(t * 0.45 + s));
-      ctx.fillStyle = `rgba(200,220,255,${tw})`;
-      ctx.beginPath(); ctx.arc(sx, sy, 0.4 + 1.6 * Math.abs(Math.sin(s * 0.29)), 0, Math.PI * 2); ctx.fill();
-    }
-
-    const mx = W * 0.74, my = H * 0.18, mr = Math.min(W,H) * 0.066;
-    const mG = ctx.createRadialGradient(mx - mr*0.2, my - mr*0.2, 0, mx, my, mr);
-    mG.addColorStop(0, 'rgba(245,235,210,0.92)'); mG.addColorStop(1, 'rgba(210,200,170,0)');
-    ctx.fillStyle = mG; ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
-    const mhG = ctx.createRadialGradient(mx, my, mr, mx, my, mr * 2.8);
-    mhG.addColorStop(0, 'rgba(210,195,155,0.10)'); mhG.addColorStop(1, 'transparent');
-    ctx.fillStyle = mhG; ctx.beginPath(); ctx.arc(mx, my, mr * 2.8, 0, Math.PI * 2); ctx.fill();
-
-    ctx.fillStyle = 'rgba(150,240,230,0.45)';
-    ctx.font = `${Math.round(Math.min(W,H) * 0.028)}px -apple-system, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('528 Hz', cx, cy + Math.min(W,H) * 0.13);
-
-    const baseY = H * 0.84;
-    for (let w = 0; w < 4; w++) {
-      ctx.strokeStyle = `rgba(30,80,180,${0.22 - w * 0.04})`;
-      ctx.lineWidth = 1.2; ctx.beginPath();
-      ctx.moveTo(0, baseY + w * 14);
-      for (let x = 0; x <= W; x += 3)
-        ctx.lineTo(x, baseY + w * 14 + Math.sin(x / W * Math.PI * 4 + t * 0.4 + w * 0.8) * 7);
-      ctx.stroke();
-    }
-  }
-
-  _drawFocus() {
-    const { ctx, canvas, t } = this;
-    const W = canvas.width, H = canvas.height;
-    const cx = W / 2, cy = H * 0.40;
-
-    ctx.fillStyle = '#020d0a'; ctx.fillRect(0, 0, W, H);
-
-    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.5);
-    bg.addColorStop(0, 'rgba(4,120,87,0.14)'); bg.addColorStop(1, 'transparent');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-
-    const R   = Math.min(W, H) * 0.18;
-    const rot = t * 0.04;
-    const centers = [[0, 0]];
-    for (let i = 0; i < 6; i++) {
-      const a = (i * Math.PI) / 3 + rot;
-      centers.push([Math.cos(a) * R, Math.sin(a) * R]);
-    }
-
-    ctx.strokeStyle = 'rgba(52,211,153,0.18)'; ctx.lineWidth = 0.9;
-    centers.forEach(([x,y]) => { ctx.beginPath(); ctx.arc(cx+x, cy+y, R, 0, Math.PI*2); ctx.stroke(); });
-
-    ctx.strokeStyle = 'rgba(52,211,153,0.07)';
-    for (let i = 0; i < 12; i++) {
-      const a = (i * Math.PI) / 6 + rot * 0.5;
-      ctx.beginPath(); ctx.arc(cx + Math.cos(a)*R*2, cy + Math.sin(a)*R*2, R, 0, Math.PI*2); ctx.stroke();
-    }
-
-    ctx.strokeStyle = 'rgba(52,211,153,0.10)'; ctx.lineWidth = 0.6;
-    for (let i = 0; i < centers.length; i++)
-      for (let j = i+1; j < centers.length; j++) {
-        ctx.beginPath();
-        ctx.moveTo(cx+centers[i][0], cy+centers[i][1]);
-        ctx.lineTo(cx+centers[j][0], cy+centers[j][1]);
-        ctx.stroke();
+    // Vertical aurora curtains (3 bands, sine-wave polygon edges)
+    const curtains = [
+      { xR: 0.25, wR: 0.32, spd: 0.080, ph: 0.0, rgb: [0,  195, 155], a: 0.22 },
+      { xR: 0.58, wR: 0.28, spd: 0.065, ph: 2.1, rgb: [70, 120, 220], a: 0.18 },
+      { xR: 0.76, wR: 0.22, spd: 0.100, ph: 4.4, rgb: [140, 55, 200], a: 0.14 },
+    ];
+    curtains.forEach(c => {
+      const xC = (c.xR + Math.sin(t * c.spd + c.ph) * 0.06) * W;
+      const wW = c.wR * W;
+      const [r, g, b] = c.rgb;
+      ctx.beginPath();
+      const S = 44;
+      for (let s = 0; s <= S; s++) {
+        const y = (s / S) * H * 0.90;
+        const wo = Math.sin(y / H * Math.PI * 3.2 + t * 0.12 + c.ph) * wW * 0.22;
+        s === 0 ? ctx.moveTo(xC - wW * 0.5 + wo, y) : ctx.lineTo(xC - wW * 0.5 + wo, y);
       }
+      for (let s = S; s >= 0; s--) {
+        const y = (s / S) * H * 0.90;
+        const wo = Math.sin(y / H * Math.PI * 3.2 + t * 0.12 + c.ph) * wW * 0.22;
+        ctx.lineTo(xC + wW * 0.5 + wo, y);
+      }
+      ctx.closePath();
+      const gr = ctx.createLinearGradient(0, 0, 0, H * 0.90);
+      gr.addColorStop(0,    `rgba(${r},${g},${b},0)`);
+      gr.addColorStop(0.12, `rgba(${r},${g},${b},${c.a})`);
+      gr.addColorStop(0.65, `rgba(${r},${g},${b},${(c.a * 0.52).toFixed(3)})`);
+      gr.addColorStop(1,    `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = gr; ctx.fill();
+    });
 
-    const pulse = 0.5 + 0.5 * Math.sin(t * 1.5);
-    const pr    = 4 + 5 * pulse;
-    const pG    = ctx.createRadialGradient(cx, cy, 0, cx, cy, pr * 3);
-    pG.addColorStop(0, `rgba(110,231,183,${0.85 - pulse * 0.25})`); pG.addColorStop(1,'transparent');
-    ctx.fillStyle = pG; ctx.beginPath(); ctx.arc(cx, cy, pr*3, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(167,243,208,0.92)';
-    ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI*2); ctx.fill();
-
-    for (let i = 0; i < 6; i++) {
-      const a  = (i * Math.PI) / 3 + t * 0.3;
-      const a2 = 0.4 + 0.6 * Math.abs(Math.sin(t + i * 1.047));
-      ctx.fillStyle = `rgba(110,231,183,${a2})`;
-      ctx.beginPath(); ctx.arc(cx + Math.cos(a)*R, cy + Math.sin(a)*R, 2.8, 0, Math.PI*2); ctx.fill();
+    // Star field (deterministic, twinkle over time)
+    for (let i = 0; i < 80; i++) {
+      const s  = i * 127.1;
+      const sx = ((Math.sin(s * 0.11) + 1) / 2) * W;
+      const sy = ((Math.sin(s * 0.073) + 1) / 2) * H * 0.78;
+      const tw = 0.10 + 0.55 * Math.abs(Math.sin(t * (0.0003 + (i % 7) * 0.00005) * 5000 + s));
+      const sr = 0.35 + 1.4 * Math.abs(Math.sin(s * 0.29));
+      ctx.fillStyle = `rgba(200,225,255,${tw.toFixed(2)})`;
+      ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
     }
-  }
 
-  _drawMorning() {
-    const { ctx, canvas, t } = this;
-    const W = canvas.width, H = canvas.height;
+    // Moon: disc + soft halo
+    const mx = W * 0.74, my = H * 0.17;
+    const mr = Math.min(W, H) * 0.064;
+    const mhG = ctx.createRadialGradient(mx, my, mr * 0.8, mx, my, mr * 3.2);
+    mhG.addColorStop(0,   'rgba(195,215,255,0.12)');
+    mhG.addColorStop(1,   'transparent');
+    ctx.fillStyle = mhG; ctx.beginPath(); ctx.arc(mx, my, mr * 3.2, 0, Math.PI * 2); ctx.fill();
+    const mG = ctx.createRadialGradient(mx - mr * 0.18, my - mr * 0.18, 0, mx, my, mr);
+    mG.addColorStop(0,   'rgba(242,238,215,0.95)');
+    mG.addColorStop(0.7, 'rgba(212,205,175,0.90)');
+    mG.addColorStop(1,   'rgba(190,182,148,0.35)');
+    ctx.fillStyle = mG; ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
 
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0,    '#090618');
-    bg.addColorStop(0.45, '#1e0e28');
-    bg.addColorStop(0.78, '#3d1408');
-    bg.addColorStop(1,    '#7a2e10');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-
-    // Sun: slowly rises, gently pulses
-    const sunX = W * 0.5;
-    const sunY = H * (0.82 - 0.08 * Math.abs(Math.sin(t * 0.007)));
-    const sunR = Math.min(W, H) * (0.072 + 0.010 * Math.sin(t * 0.55));
-
-    // Outer horizon glow
-    const hG = ctx.createRadialGradient(sunX, sunY, sunR, sunX, sunY, Math.min(W,H) * 0.55);
-    hG.addColorStop(0,   'rgba(255,160,40,0.16)');
-    hG.addColorStop(0.5, 'rgba(200,80,20,0.06)');
-    hG.addColorStop(1,   'transparent');
-    ctx.fillStyle = hG; ctx.fillRect(0, 0, W, H);
-
-    // Light rays
-    ctx.save();
-    ctx.globalAlpha = 0.03 + 0.015 * Math.sin(t * 0.4);
-    for (let i = 0; i < 14; i++) {
-      const a1 = (i / 14) * Math.PI * 2 + t * 0.018;
-      const a2 = a1 + 0.07;
-      ctx.fillStyle = 'rgba(255,220,120,1)';
+    // Gentle ocean waves at the bottom
+    for (let w = 0; w < 4; w++) {
+      const baseY = H * (0.82 + w * 0.045);
+      ctx.strokeStyle = `rgba(20,100,180,${(0.18 - w * 0.035).toFixed(3)})`;
+      ctx.lineWidth = 0.9;
       ctx.beginPath();
-      ctx.moveTo(sunX, sunY);
-      ctx.arc(sunX, sunY, W * 0.85, a1, a2);
-      ctx.closePath(); ctx.fill();
-    }
-    ctx.restore();
-
-    // Sun disc
-    const sunG = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
-    sunG.addColorStop(0,   'rgba(255,245,200,0.96)');
-    sunG.addColorStop(0.55,'rgba(255,195,60,0.80)');
-    sunG.addColorStop(1,   'rgba(255,130,30,0.12)');
-    ctx.fillStyle = sunG;
-    ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2); ctx.fill();
-
-    // Shimmer particles (warm golden)
-    for (let i = 0; i < 45; i++) {
-      const s  = i * 137.51;
-      const px = W * 0.10 + ((Math.sin(s * 0.13) + 1) / 2) * W * 0.80;
-      const py = H * 0.05 + ((Math.sin(s * 0.09) + 1) / 2) * H * 0.70;
-      const a  = 0.12 + 0.55 * Math.abs(Math.sin(t * 0.55 + s * 0.7));
-      ctx.fillStyle = `rgba(255,215,130,${a})`;
-      ctx.beginPath();
-      ctx.arc(px, py, 0.5 + 2.0 * Math.abs(Math.sin(s * 0.38)), 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  _drawReady() {
-    const { ctx, canvas, t } = this;
-    const W = canvas.width, H = canvas.height;
-    const cx = W / 2, cy = H * 0.40;
-
-    ctx.fillStyle = '#0f0800'; ctx.fillRect(0, 0, W, H);
-
-    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, W * 0.65);
-    bg.addColorStop(0,   'rgba(217,119,6,0.22)');
-    bg.addColorStop(0.5, 'rgba(180,60,0,0.08)');
-    bg.addColorStop(1,   'transparent');
-    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-
-    const pulse = 0.5 + 0.5 * Math.sin(t * 2.2);
-    const R     = Math.min(W, H) * (0.13 + 0.06 * pulse);
-
-    for (let i = 3; i >= 1; i--) {
-      const g = ctx.createRadialGradient(cx, cy, R * 0.6, cx, cy, R * i);
-      g.addColorStop(0, `rgba(251,191,36,${0.16 / i})`);
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(cx, cy, R * i, 0, Math.PI * 2); ctx.fill();
-    }
-
-    const cG = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-    cG.addColorStop(0,   'rgba(255,245,200,0.92)');
-    cG.addColorStop(0.5, 'rgba(251,191,36,0.55)');
-    cG.addColorStop(1,   'rgba(217,119,6,0.05)');
-    ctx.fillStyle = cG;
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
-
-    // Orbiting particles
-    for (let i = 0; i < 8; i++) {
-      const a  = (i / 8) * Math.PI * 2 + t * 0.90;
-      const r2 = R * (1.5 + 0.4 * Math.sin(t * 2.0 + i));
-      const px = cx + Math.cos(a) * r2;
-      const py = cy + Math.sin(a) * r2;
-      const al = 0.5 + 0.5 * Math.abs(Math.sin(t * 1.4 + i * 0.9));
-      ctx.fillStyle = `rgba(251,191,36,${al})`;
-      ctx.beginPath(); ctx.arc(px, py, 2.5 + 2.0 * al, 0, Math.PI * 2); ctx.fill();
-    }
-
-    // Outer spark field
-    for (let i = 0; i < 26; i++) {
-      const s  = i * 137.51;
-      const r3 = R * (1.9 + 0.9 * Math.abs(Math.sin(s * 0.31)));
-      const a  = s + t * (0.28 + 0.18 * Math.sin(s));
-      const px = cx + Math.cos(a) * r3;
-      const py = cy + Math.sin(a) * r3 * 0.82;
-      const al = 0.10 + 0.45 * Math.abs(Math.sin(t * 0.8 + s));
-      ctx.fillStyle = `rgba(251,191,36,${al})`;
-      ctx.beginPath(); ctx.arc(px, py, 0.8 + 1.5 * Math.abs(Math.sin(s)), 0, Math.PI * 2); ctx.fill();
-    }
-
-    // Horizontal energy waves
-    for (let i = 0; i < 3; i++) {
-      const ly = cy + (i - 1) * Math.min(W,H) * 0.13 + Math.sin(t * 1.5 + i) * 8;
-      ctx.strokeStyle = `rgba(251,191,36,${0.07 + 0.04 * Math.sin(t + i)})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let x = 0; x <= W; x += 3)
-        ctx.lineTo(x, ly + Math.sin(x / W * Math.PI * 6 + t * 1.8 + i) * 5);
+      for (let x = 0; x <= W; x += 3) {
+        const y = baseY + Math.sin(x / W * Math.PI * 4.5 + t * (0.28 - w * 0.03) + w * 0.8) * (6 - w);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
       ctx.stroke();
     }
   }
