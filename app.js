@@ -777,18 +777,24 @@ class HealingApp {
     }
     const W = c.width, H = c.height, t = this.bgT;
 
-    // ── Base fill ──
-    ctx.fillStyle = '#040810';
+    // ── Base fill: deep ocean (not pure black) ──
+    const baseFill = ctx.createLinearGradient(0, 0, 0, H);
+    baseFill.addColorStop(0,   '#0d2038');
+    baseFill.addColorStop(0.5, '#0b1929');
+    baseFill.addColorStop(1,   '#091420');
+    ctx.fillStyle = baseFill;
     ctx.fillRect(0, 0, W, H);
 
-    // ── Aurora nebula blobs (slow drift, richer colors) ──
+    // ── Ocean/dusk nebula blobs ──
+    // Mix of ocean teal, twilight violet, warm sunset amber
     const blobs = [
-      { cx:0.20, cy:0.30, r:0.68, rgb:[80, 100,230],  a:0.055, sx:0.12, sy:0.09, sp:0.00018, ph:0.0 },
-      { cx:0.80, cy:0.60, r:0.58, rgb:[140, 60,200],  a:0.042, sx:0.10, sy:0.11, sp:0.00013, ph:2.1 },
-      { cx:0.50, cy:0.10, r:0.50, rgb:[ 30,150,210],  a:0.030, sx:0.09, sy:0.08, sp:0.00015, ph:4.3 },
-      { cx:0.10, cy:0.80, r:0.44, rgb:[ 90, 70,210],  a:0.038, sx:0.07, sy:0.10, sp:0.00017, ph:1.2 },
-      { cx:0.88, cy:0.18, r:0.40, rgb:[ 40,120,200],  a:0.024, sx:0.08, sy:0.07, sp:0.00014, ph:3.5 },
-      { cx:0.55, cy:0.85, r:0.36, rgb:[160, 80,240],  a:0.028, sx:0.11, sy:0.06, sp:0.00020, ph:5.1 },
+      { cx:0.20, cy:0.30, r:0.70, rgb:[ 14,120,210],  a:0.060, sx:0.12, sy:0.09, sp:0.00018, ph:0.0 },
+      { cx:0.80, cy:0.55, r:0.60, rgb:[120, 40,180],  a:0.045, sx:0.10, sy:0.11, sp:0.00013, ph:2.1 },
+      { cx:0.50, cy:0.08, r:0.52, rgb:[ 20,150,190],  a:0.038, sx:0.09, sy:0.08, sp:0.00015, ph:4.3 },
+      { cx:0.10, cy:0.78, r:0.46, rgb:[ 60, 80,200],  a:0.042, sx:0.07, sy:0.10, sp:0.00017, ph:1.2 },
+      { cx:0.88, cy:0.22, r:0.42, rgb:[200, 80, 60],  a:0.030, sx:0.08, sy:0.07, sp:0.00014, ph:3.5 }, // sunset glow
+      { cx:0.55, cy:0.88, r:0.38, rgb:[180, 60,200],  a:0.032, sx:0.11, sy:0.06, sp:0.00020, ph:5.1 },
+      { cx:0.35, cy:0.65, r:0.34, rgb:[240,140, 40],  a:0.022, sx:0.06, sy:0.08, sp:0.00016, ph:0.8 }, // warm amber
     ];
 
     blobs.forEach(b => {
@@ -815,8 +821,9 @@ class HealingApp {
       }));
     }
     this._bgStars.forEach(s => {
-      const tw = 0.06 + 0.28 * Math.abs(Math.sin(t * s.speed + s.phase));
-      ctx.fillStyle = `rgba(180,200,240,${tw.toFixed(3)})`;
+      const tw = 0.08 + 0.32 * Math.abs(Math.sin(t * s.speed + s.phase));
+      // Slightly warm-tinted stars (ocean/dusk feel)
+      ctx.fillStyle = `rgba(200,230,255,${tw.toFixed(3)})`;
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
       ctx.fill();
