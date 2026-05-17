@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#040810">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Healing Sound">
+  <meta name="apple-mobile-web-app-title" content="Nagi">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <title>Healing Sound</title>
+  <title>Nagi</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,8 +19,31 @@
   <!-- ① Home: カテゴリ選択 -->
   <div id="home" class="screen active">
     <div class="home-header">
-      <h1>Healing Sound</h1>
-      <p>心と体を癒す音楽</p>
+      <div class="home-logo">
+        <svg class="logo-wave" viewBox="0 0 80 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="wg" x1="0" y1="0" x2="80" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stop-color="#818cf8" stop-opacity="0.3"/>
+              <stop offset="50%"  stop-color="#c4b5fd" stop-opacity="1"/>
+              <stop offset="100%" stop-color="#818cf8" stop-opacity="0.3"/>
+            </linearGradient>
+          </defs>
+          <!-- background thin line -->
+          <line x1="0" y1="14" x2="80" y2="14" stroke="url(#wg)" stroke-width="0.6" stroke-opacity="0.35"/>
+          <!-- main wave -->
+          <path d="M0,14 C6,14 8,4 14,4 C20,4 22,24 28,24 C34,24 36,4 42,4 C48,4 50,24 56,24 C62,24 64,4 70,4 C76,4 78,14 80,14"
+                stroke="url(#wg)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- secondary wave (thinner, offset) -->
+          <path d="M0,14 C6,14 8,9 14,9 C20,9 22,19 28,19 C34,19 36,9 42,9 C48,9 50,19 56,19 C62,19 64,9 70,9 C76,9 78,14 80,14"
+                stroke="url(#wg)" stroke-width="0.8" fill="none" stroke-linecap="round" stroke-opacity="0.40"/>
+          <!-- center dot -->
+          <circle cx="40" cy="4" r="3" fill="#c4b5fd" fill-opacity="0.85"/>
+          <circle cx="40" cy="4" r="6" fill="#818cf8" fill-opacity="0.20"/>
+        </svg>
+      </div>
+      <h1>Nagi</h1>
+      <p class="home-sub-en">Sound Space for Your Mind</p>
+      <p class="home-sub-jp">静寂と音が溶け合う場所</p>
     </div>
     <div class="category-list">
       <div class="category-card" data-cat="morning">

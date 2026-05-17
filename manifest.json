@@ -1,11 +1,11 @@
 {
-  "name": "Healing Sound",
-  "short_name": "Healing",
-  "description": "心と体を癒す音楽",
+  "name": "Nagi",
+  "short_name": "Nagi",
+  "description": "静寂と音が溶け合う、心のためのサウンドスペース",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#050912",
-  "theme_color": "#050912",
+  "background_color": "#040810",
+  "theme_color": "#040810",
   "orientation": "portrait",
   "icons": [
     {

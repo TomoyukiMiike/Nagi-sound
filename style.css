@@ -70,26 +70,46 @@ html, body {
 /* ── Header ── */
 .home-header {
   text-align: center;
-  padding: 3rem 2rem 2rem;
+  padding: 2.8rem 2rem 1.8rem;
   position: relative;
   flex-shrink: 0;
 }
 
+.home-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.0rem;
+}
+
+.logo-wave {
+  width: 72px;
+  height: auto;
+  filter: drop-shadow(0 0 8px rgba(196,181,253,0.35));
+}
+
 .home-header h1 {
-  font-size: clamp(1.5rem, 5vw, 2rem);
-  font-weight: 200;
-  letter-spacing: 0.30em;
-  background: linear-gradient(135deg, #a5b4fc 0%, #7dd3fc 50%, #c4b5fd 100%);
+  font-size: clamp(2rem, 6vw, 2.6rem);
+  font-weight: 100;
+  letter-spacing: 0.42em;
+  background: linear-gradient(135deg, #a5b4fc 0%, #e0e7ff 45%, #c4b5fd 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.55rem;
+  text-indent: 0.42em; /* compensate letter-spacing on last char */
 }
 
-.home-header p {
-  font-size: 0.68rem;
+.home-sub-en {
+  font-size: 0.62rem;
+  color: rgba(165,180,252,0.45);
+  letter-spacing: 0.20em;
+  margin-bottom: 0.20rem;
+}
+
+.home-sub-jp {
+  font-size: 0.60rem;
   color: var(--text-lo);
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
 }
 
 /* ── Category cards ── */
