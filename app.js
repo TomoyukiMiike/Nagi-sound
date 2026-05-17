@@ -752,6 +752,9 @@ class HealingApp {
 
     this._audioEl = null;
 
+    this.soundBuffers  = {};    // keyed by sound name, AudioBuffer once loaded
+    this._soundsReady  = Promise.resolve();  // resolves after all files decoded
+
     this._initUI();
     this._initBgCanvas();
   }
@@ -871,6 +874,53 @@ class HealingApp {
 
     this.reverbSend = this.ac.createGain();
     this.reverbSend.connect(this.reverb);
+
+    // Start async preload of all real audio files
+    this._soundsReady = this._preloadSounds();
+  }
+
+  // Preload all MP3 samples and store as AudioBuffers
+  async _preloadSounds() {
+    const FILES = {
+      rain:   'sounds/rain.mp3',
+      ocean:  'sounds/ocean.mp3',
+      stream: 'sounds/stream.mp3',
+      wind:   'sounds/wind.mp3',
+      fire:   'sounds/fire.mp3',
+      bowl:   'sounds/bowl.mp3',
+      birds:  'sounds/birds.mp3',
+    };
+    await Promise.all(Object.entries(FILES).map(async ([key, url]) => {
+      try {
+        const res  = await fetch(url);
+        if (!res.ok) throw new Error(res.status);
+        const ab   = await res.arrayBuffer();
+        this.soundBuffers[key] = await this.ac.decodeAudioData(ab);
+      } catch (e) {
+        console.warn(`[HealingSound] Could not load ${url}:`, e);
+        this.soundBuffers[key] = null;
+      }
+    }));
+  }
+
+  // Helper: create a looping AudioBuffer source from a preloaded sample
+  _makeFileLoop(key, useReverb = false) {
+    const ac       = this.ac;
+    const gainNode = ac.createGain();
+    gainNode.gain.value = 0;
+    gainNode.connect(this.dryBus);
+    if (useReverb) gainNode.connect(this.reverbSend);
+    const nodes = [];
+    const buf = this.soundBuffers[key];
+    if (buf) {
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.loop   = true;
+      src.connect(gainNode);
+      src.start();
+      nodes.push(src);
+    }
+    return { gainNode, nodes };
   }
 
   // ── Sound generators ──────────────────────────────────────────────────────
@@ -924,11 +974,27 @@ class HealingApp {
 
   // Rain: three bandpass noise layers (large/medium/fine drops) with slow intensity LFO
   _makeRain() {
+    // Use real recording; gentle LP to soften harsh high end
+    if (this.soundBuffers.rain) {
+      const ac       = this.ac;
+      const gainNode = ac.createGain();
+      gainNode.gain.value = 0;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 6000; lp.Q.value = 0.5;
+      lp.connect(this.dryBus);
+      gainNode.connect(lp);
+      const src = ac.createBufferSource();
+      src.buffer = this.soundBuffers.rain;
+      src.loop   = true;
+      src.connect(gainNode);
+      src.start();
+      return { gainNode, nodes: [src] };
+    }
+    // ── synthesis fallback ──
     const ac       = this.ac;
     const gainNode = ac.createGain();
     gainNode.gain.value = 0;
     gainNode.connect(this.dryBus);
-
     const nodes = [];
     [
       { hpf:  80, lpf:  450, vol: 0.52 },
@@ -938,70 +1004,35 @@ class HealingApp {
       const src = ac.createBufferSource();
       src.buffer = buildNoiseBuffer(ac, 'pink');
       src.loop   = true;
-
       const hp = ac.createBiquadFilter();
       hp.type = 'highpass'; hp.frequency.value = hpf; hp.Q.value = 0.5;
       const lp = ac.createBiquadFilter();
       lp.type = 'lowpass';  lp.frequency.value = lpf; lp.Q.value = 0.4;
-
-      // Very slow LFO — drizzle vs brief heavier moments
       const lfo  = ac.createOscillator();
       const lfoG = ac.createGain();
       lfo.frequency.value = 0.03 + Math.random() * 0.05;
       lfoG.gain.value     = vol * 0.22;
-
       const g = ac.createGain();
       g.gain.value = vol * 0.78;
-      lfo.connect(lfoG);
-      lfoG.connect(g.gain);
+      lfo.connect(lfoG); lfoG.connect(g.gain);
       src.connect(hp); hp.connect(lp); lp.connect(g);
       g.connect(gainNode);
       src.start(); lfo.start();
       nodes.push(src, lfo);
     });
-
     return { gainNode, nodes };
   }
 
-  // Ocean: brown noise with two overlapping wave LFOs for organic irregularity
   _makeOcean() {
-    const ac       = this.ac;
-    const gainNode = ac.createGain();
-    gainNode.gain.value = 0;
-    gainNode.connect(this.dryBus);
-    gainNode.connect(this.reverbSend);
-
-    const src = ac.createBufferSource();
-    src.buffer = buildNoiseBuffer(ac, 'brown');
-    src.loop   = true;
-
-    const lp = ac.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 480; lp.Q.value = 0.35;
-
-    // Primary wave (~9–14s period) + secondary modulation (~22–32s) = irregular feel
-    const w1 = ac.createOscillator(), w1G = ac.createGain();
-    w1.frequency.value = 0.08 + Math.random() * 0.04;
-    w1G.gain.value     = 0.30;
-    w1.connect(w1G);
-
-    const w2 = ac.createOscillator(), w2G = ac.createGain();
-    w2.frequency.value = 0.033 + Math.random() * 0.018;
-    w2G.gain.value     = 0.14;
-    w2.connect(w2G);
-
-    const amp = ac.createGain();
-    amp.gain.value = 0.56;
-    w1G.connect(amp.gain);
-    w2G.connect(amp.gain);
-
-    src.connect(lp); lp.connect(amp); amp.connect(gainNode);
-    src.start(); w1.start(); w2.start();
-
-    return { gainNode, nodes: [src, w1, w2] };
+    return this._makeFileLoop('ocean', true);
   }
 
-  // Fire: almost-silent warmth base + realistic individual crackle/pop events
   _makeFire() {
+    // Use real recording when available
+    if (this.soundBuffers.fire) {
+      return this._makeFileLoop('fire', false);
+    }
+    // ── synthesis fallback ──
     const ac       = this.ac;
     const gainNode = ac.createGain();
     gainNode.gain.value = 0;
@@ -1181,82 +1212,11 @@ class HealingApp {
 
   // Wind: pink noise through bandpass with slow filter + amplitude LFOs for gusting
   _makeWind() {
-    const ac       = this.ac;
-    const gainNode = ac.createGain();
-    gainNode.gain.value = 0;
-    gainNode.connect(this.dryBus);
-
-    const src = ac.createBufferSource();
-    src.buffer = buildNoiseBuffer(ac, 'pink');
-    src.loop   = true;
-
-    const hp = ac.createBiquadFilter();
-    hp.type = 'highpass'; hp.frequency.value = 100; hp.Q.value = 0.5;
-    const bp = ac.createBiquadFilter();
-    bp.type = 'bandpass'; bp.frequency.value = 340; bp.Q.value = 1.2;
-
-    // LFO modulates filter pitch (wind character variation)
-    const fLfo  = ac.createOscillator();
-    const fLfoG = ac.createGain();
-    fLfo.frequency.value = 0.028 + Math.random() * 0.045;
-    fLfoG.gain.value     = 200;
-    fLfo.connect(fLfoG);
-    fLfoG.connect(bp.frequency);
-
-    // LFO modulates amplitude (gust surges)
-    const aLfo  = ac.createOscillator();
-    const aLfoG = ac.createGain();
-    aLfo.frequency.value = 0.018 + Math.random() * 0.032;
-    aLfoG.gain.value     = 0.28;
-    const amp = ac.createGain();
-    amp.gain.value = 0.72;
-    aLfo.connect(aLfoG);
-    aLfoG.connect(amp.gain);
-
-    src.connect(hp); hp.connect(bp); bp.connect(amp); amp.connect(gainNode);
-    src.start(); fLfo.start(); aLfo.start();
-
-    return { gainNode, nodes: [src, fLfo, aLfo] };
+    return this._makeFileLoop('wind', false);
   }
 
-  // Stream: layered filtered noise with faster LFO for babbling-brook feel
   _makeStream() {
-    const ac       = this.ac;
-    const gainNode = ac.createGain();
-    gainNode.gain.value = 0;
-    gainNode.connect(this.dryBus);
-    gainNode.connect(this.reverbSend);
-
-    const nodes = [];
-    [
-      { type: 'pink',  hp: 380, lp: 3200, vol: 0.54, lfoHz: 0.20 },
-      { type: 'brown', hp:  65, lp:  500, vol: 0.40, lfoHz: 0.10 },
-    ].forEach(({ type, hp, lp, vol, lfoHz }) => {
-      const src = ac.createBufferSource();
-      src.buffer = buildNoiseBuffer(ac, type);
-      src.loop   = true;
-
-      const hpf = ac.createBiquadFilter();
-      hpf.type = 'highpass'; hpf.frequency.value = hp; hpf.Q.value = 0.55;
-      const lpf = ac.createBiquadFilter();
-      lpf.type = 'lowpass';  lpf.frequency.value = lp; lpf.Q.value = 0.40;
-
-      const lfo  = ac.createOscillator();
-      const lfoG = ac.createGain();
-      lfo.frequency.value = lfoHz + Math.random() * lfoHz;
-      lfoG.gain.value     = vol * 0.22;
-
-      const g = ac.createGain();
-      g.gain.value = vol * 0.78;
-      lfo.connect(lfoG);
-      lfoG.connect(g.gain);
-      src.connect(hpf); hpf.connect(lpf); lpf.connect(g);
-      g.connect(gainNode);
-      src.start(); lfo.start();
-      nodes.push(src, lfo);
-    });
-
-    return { gainNode, nodes };
+    return this._makeFileLoop('stream', true);
   }
 
   // Bird: single chirp — ascending frequency sweep with fast decay
@@ -1287,6 +1247,16 @@ class HealingApp {
 
   // Randomly schedules clusters of 1-4 chirps every 8-28 s
   _scheduleBirds(destGain) {
+    // Real audio: loop the birds recording continuously
+    if (this.soundBuffers.birds) {
+      const src = this.ac.createBufferSource();
+      src.buffer = this.soundBuffers.birds;
+      src.loop   = true;
+      src.connect(destGain);
+      src.start();
+      return;
+    }
+    // Synthesis fallback: synthesized chirp clusters
     const baseFreqs = [2200, 2800, 3400, 2500, 3100];
     const scheduleCluster = () => {
       if (!this.isPlaying) return;
@@ -1377,6 +1347,21 @@ class HealingApp {
   _makeTibetanBowl(destGain) {
     const ac  = this.ac;
     const now = ac.currentTime;
+    // Use real bowl recording when available
+    if (this.soundBuffers.bowl) {
+      const src = ac.createBufferSource();
+      src.buffer = this.soundBuffers.bowl;
+      const env = ac.createGain();
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(0.90, now + 0.06);
+      env.gain.setTargetAtTime(0.0001, now + 1.0, 5.5);
+      src.connect(env);
+      env.connect(destGain);
+      env.connect(this.reverbSend);
+      src.start(now);
+      return;
+    }
+    // Synthesis fallback
     [1, 1.74, 2.76].forEach((r, i) => {
       const osc = ac.createOscillator();
       osc.type  = 'sine';
@@ -1460,7 +1445,7 @@ class HealingApp {
 
   // ── Category start ────────────────────────────────────────────────────────
 
-  _startCategory(cat, moodId) {
+  async _startCategory(cat, moodId) {
     this._initAudio();
     this.isPlaying   = true;
     this.currentCat  = cat;
@@ -1468,6 +1453,10 @@ class HealingApp {
 
     const preset = PRESETS[cat][moodId];
     this.layers = [];
+
+    // Wait for all audio files to be decoded before building layers
+    await this._soundsReady;
+    if (!this.isPlaying) return;  // user may have cancelled during load
 
     preset.layers.forEach(def => {
       switch (def.type) {
