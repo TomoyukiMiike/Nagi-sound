@@ -185,6 +185,14 @@ const PRESLEEP_MOODS = [
   { id: 'stretch',   label: 'ストレッチ',    icon: '🧘', desc: '体をほぐして眠りへ' },
 ];
 
+const WALK_MOODS = [
+  { id: 'park',    label: '公園・緑地',     icon: '🌲', desc: '木々の中をゆっくり歩く' },
+  { id: 'urban',   label: '都会の通勤路',   icon: '🌆', desc: '街中でも自然を感じながら' },
+  { id: 'seaside', label: '海辺の散歩',     icon: '🏖️', desc: '波音を感じながら歩く' },
+  { id: 'mountain',label: '山道・ハイキング',icon: '⛰️', desc: '山の空気を感じながら' },
+  { id: 'night',   label: '夜の散歩',      icon: '🌙', desc: '静かな夜に一人でゆっくりと' },
+];
+
 // ─── Just Intonation Frequencies ────────────────────────────────────────────
 // Root: C4 = 264 Hz → A4 = 440 Hz (standard pitch) → C5 = 528 Hz (solfeggio)
 // All intervals are pure integer ratios. No equal-temperament approximations.
@@ -935,6 +943,7 @@ const TIMER_OPTIONS = {
   morning:    [{l:'なし',m:0},{l:'15分',m:15},{l:'30分',m:30},{l:'60分',m:60}],
   relax:      [{l:'なし',m:0},{l:'15分',m:15},{l:'30分',m:30},{l:'45分',m:45},{l:'60分',m:60}],
   presleep: [{l:'なし',m:0},{l:'30分',m:30},{l:'45分',m:45},{l:'60分',m:60},{l:'90分',m:90}],
+  walk: [{l:'なし',m:0},{l:'15分',m:15},{l:'30分',m:30},{l:'45分',m:45},{l:'60分',m:60}],
 };
 
 // A major (bright, uplifting): A3=220 C#4=277.18 E4=329.63 A4=440 C#5=554.37 E5=659.25
@@ -1664,6 +1673,108 @@ PRESETS.presleep = [
             [null, 176, 220, null, null],
           ], bpm:13, startDelay:7, vol:0.36 },
         { type:'solfeggio', name:'528Hz ソルフェジオ',  icon:'✦',  vol:0.42 },
+      ]},
+    ]
+  },
+];
+
+PRESETS.walk = [
+  // 0: 公園・緑地
+  {
+    presets: [
+      { name:'ライト', layers: [
+        { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.62 },
+        { type:'stream', name:'川の流れ',       icon:'💧', vol:0.44 },
+      ]},
+      { name:'スタンダード', layers: [
+        { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.60 },
+        { type:'stream', name:'川の流れ',       icon:'💧', vol:0.46 },
+        { type:'wind',   name:'風の音',         icon:'🍃', vol:0.28 },
+      ]},
+      { name:'ディープ', layers: [
+        { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.58 },
+        { type:'stream', name:'川の流れ',       icon:'💧', vol:0.50 },
+        { type:'wind',   name:'風の音',         icon:'🍃', vol:0.32 },
+        { type:'rain',   name:'小雨',           icon:'🌧️', vol:0.20 },
+      ]},
+    ]
+  },
+  // 1: 都会の通勤路
+  {
+    presets: [
+      { name:'ライト', layers: [
+        { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.55 },
+        { type:'noise',  name:'ブラウンノイズ', icon:'🌫️', noiseType:'brown', vol:0.30 },
+      ]},
+      { name:'スタンダード', layers: [
+        { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.54 },
+        { type:'stream', name:'川の流れ',       icon:'💧', vol:0.38 },
+        { type:'noise',  name:'ブラウンノイズ', icon:'🌫️', noiseType:'brown', vol:0.34 },
+      ]},
+      { name:'ディープ', layers: [
+        { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.52 },
+        { type:'rain',   name:'雨音',           icon:'🌧️', vol:0.42 },
+        { type:'stream', name:'川の流れ',       icon:'💧', vol:0.36 },
+        { type:'noise',  name:'ブラウンノイズ', icon:'🌫️', noiseType:'brown', vol:0.32 },
+      ]},
+    ]
+  },
+  // 2: 海辺の散歩
+  {
+    presets: [
+      { name:'ライト', layers: [
+        { type:'ocean', name:'波の音', icon:'🌊', vol:0.68 },
+      ]},
+      { name:'スタンダード', layers: [
+        { type:'ocean', name:'波の音',         icon:'🌊', vol:0.66 },
+        { type:'wind',  name:'潮風',           icon:'🍃', vol:0.30 },
+        { type:'birds', name:'海鳥のさえずり', icon:'🐦', vol:0.32 },
+      ]},
+      { name:'ディープ', layers: [
+        { type:'ocean', name:'波の音',         icon:'🌊', vol:0.70 },
+        { type:'wind',  name:'潮風',           icon:'🍃', vol:0.36 },
+        { type:'rain',  name:'小雨',           icon:'🌧️', vol:0.22 },
+        { type:'birds', name:'海鳥のさえずり', icon:'🐦', vol:0.24 },
+      ]},
+    ]
+  },
+  // 3: 山道・ハイキング
+  {
+    presets: [
+      { name:'ライト', layers: [
+        { type:'stream', name:'山の流れ',       icon:'💧', vol:0.58 },
+        { type:'birds',  name:'山鳥のさえずり', icon:'🐦', vol:0.50 },
+      ]},
+      { name:'スタンダード', layers: [
+        { type:'stream', name:'山の流れ',       icon:'💧', vol:0.60 },
+        { type:'birds',  name:'山鳥のさえずり', icon:'🐦', vol:0.52 },
+        { type:'wind',   name:'山の風',         icon:'🍃', vol:0.34 },
+      ]},
+      { name:'ディープ', layers: [
+        { type:'stream',   name:'山の流れ',       icon:'💧', vol:0.58 },
+        { type:'birds',    name:'山鳥のさえずり', icon:'🐦', vol:0.50 },
+        { type:'wind',     name:'山の風',         icon:'🍃', vol:0.38 },
+        { type:'crickets', name:'虫の声',         icon:'🦗', vol:0.28 },
+      ]},
+    ]
+  },
+  // 4: 夜の散歩
+  {
+    presets: [
+      { name:'ライト', layers: [
+        { type:'crickets', name:'コオロギ', icon:'🦗', vol:0.55 },
+        { type:'wind',     name:'夜風',    icon:'🍃', vol:0.32 },
+      ]},
+      { name:'スタンダード', layers: [
+        { type:'crickets', name:'コオロギ', icon:'🦗', vol:0.55 },
+        { type:'stream',   name:'小川',    icon:'💧', vol:0.38 },
+        { type:'wind',     name:'夜風',    icon:'🍃', vol:0.36 },
+      ]},
+      { name:'ディープ', layers: [
+        { type:'crickets', name:'コオロギ', icon:'🦗', vol:0.52 },
+        { type:'rain',     name:'夜雨',    icon:'🌧️', vol:0.36 },
+        { type:'stream',   name:'小川',    icon:'💧', vol:0.34 },
+        { type:'wind',     name:'夜風',    icon:'🍃', vol:0.30 },
       ]},
     ]
   },
@@ -3120,6 +3231,7 @@ class HealingApp {
       else if (cat === 'presleep')   this._drawPresleep();
       else if (cat === 'morning')    this._drawMorning();
       else if (cat === 'relax')      this._drawRelax();
+      else if (cat === 'walk')       this._drawWalk();
       else                           this._drawFocus();
       this.animFrame = requestAnimationFrame(render);
     };
@@ -3298,6 +3410,117 @@ class HealingApp {
       ctx.fillStyle = `rgba(${moteRgb},${al})`;
       ctx.beginPath(); ctx.arc(px, py, 0.6 + 1.4 * Math.abs(Math.sin(s * 0.44)), 0, Math.PI * 2); ctx.fill();
     }
+  }
+
+  // ── 散歩 — Outdoor Walk (time-aware) ─────────────────────────────────────
+  _drawWalk() {
+    const { ctx, canvas, t } = this;
+    const W = canvas.width, H = canvas.height;
+    const hr  = this._getHour();
+    // Time-of-day: 0=night, 1=noon
+    const day  = Math.max(0, Math.sin((hr - 6) / 12 * Math.PI));
+    const eve  = Math.max(0, 1 - Math.abs(hr - 18) / 3);   // golden hour peaks 18:00
+    const nite = Math.max(0, 1 - day * 1.4);
+
+    // Sky gradient — blue day / golden evening / deep night
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    const r0 = (8  + day*52  + eve*40 - nite*4)  | 0;
+    const g0 = (12 + day*88  + eve*20)            | 0;
+    const b0 = (28 + day*120 - eve*60 - nite*10)  | 0;
+    const r1 = (20 + day*28  + eve*80)            | 0;
+    const g1 = (45 + day*80  + eve*38)            | 0;
+    const b1 = (20 + day*30  - eve*20)            | 0;
+    sky.addColorStop(0,    `rgb(${r0},${g0},${b0})`);
+    sky.addColorStop(0.55, `rgb(${r1},${g1},${b1})`);
+    sky.addColorStop(1,    `rgb(${(10+day*30+eve*50)|0},${(38+day*65+eve*30)|0},${(10+day*10)|0})`);
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+    // Ground plane — green at day, darker at night
+    const gndA = 0.22 + day * 0.28 + eve * 0.10;
+    const gnd = ctx.createLinearGradient(0, H * 0.62, 0, H);
+    gnd.addColorStop(0, `rgba(30,${(80+day*40)|0},20,${gndA.toFixed(2)})`);
+    gnd.addColorStop(1, `rgba(10,${(40+day*20)|0},8,${(gndA*0.4).toFixed(2)})`);
+    ctx.fillStyle = gnd; ctx.fillRect(0, H * 0.62, W, H);
+
+    // Slow-swaying trees (silhouettes)
+    const treeColor = nite > 0.5
+      ? `rgba(8,18,10,0.85)`
+      : `rgba(${(15+day*10)|0},${(55+day*30)|0},${(12+day*8)|0},0.72)`;
+    const trees = [
+      { x: 0.08, h: 0.42, w: 0.10, sway: 1.8, spd: 0.22 },
+      { x: 0.20, h: 0.35, w: 0.08, sway: 1.5, spd: 0.17 },
+      { x: 0.78, h: 0.38, w: 0.09, sway: 1.6, spd: 0.20 },
+      { x: 0.90, h: 0.44, w: 0.11, sway: 2.0, spd: 0.25 },
+      { x: 0.50, h: 0.28, w: 0.07, sway: 1.2, spd: 0.14 },
+    ];
+    trees.forEach(tr => {
+      const sway = Math.sin(t * tr.spd) * tr.sway / 100;
+      const tx   = (tr.x + sway) * W;
+      const ty   = (0.62 - tr.h * 0.7) * H;
+      const th   = tr.h * H;
+      const tw   = tr.w * W;
+      // Trunk
+      ctx.fillStyle = treeColor;
+      ctx.fillRect(tx - tw * 0.06, ty + th * 0.55, tw * 0.12, th * 0.45);
+      // Canopy (oval)
+      ctx.beginPath();
+      ctx.ellipse(tx, ty + th * 0.30, tw * 0.5, th * 0.42, sway * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = treeColor;
+      ctx.fill();
+    });
+
+    // Drifting light motes (morning sun dust / fireflies at night)
+    if (!this._walkMotes) {
+      this._walkMotes = Array.from({ length: 22 }, () => ({
+        x: Math.random(), y: Math.random() * 0.65 + 0.05,
+        r: 0.8 + Math.random() * 2.2,
+        dx: (Math.random() - 0.5) * 0.00018,
+        dy: -Math.random() * 0.00012 - 0.00004,
+        phase: Math.random() * Math.PI * 2,
+        spd: 0.4 + Math.random() * 0.8,
+      }));
+    }
+    this._walkMotes.forEach(m => {
+      m.x += m.dx; m.y += m.dy;
+      if (m.y < -0.02) { m.y = 0.70; m.x = Math.random(); }
+      if (m.x < -0.02 || m.x > 1.02) m.x = Math.random();
+      const pulse = 0.45 + 0.55 * Math.sin(t * m.spd + m.phase);
+      const alpha = (nite > 0.3 ? 0.55 : 0.22) * pulse;
+      const [mr, mg, mb] = nite > 0.3
+        ? [200, 255, 160]   // firefly green-yellow at night
+        : [255, 230, 100];  // golden dust at day
+      ctx.beginPath();
+      ctx.arc(m.x * W, m.y * H, m.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${mr},${mg},${mb},${alpha.toFixed(3)})`;
+      ctx.fill();
+    });
+
+    // Sun / moon disc
+    const discX = W * (0.72 + Math.sin(t * 0.008) * 0.02);
+    const discY = H * (nite > 0.5 ? 0.18 : Math.max(0.08, 0.42 - day * 0.30));
+    if (nite > 0.5) {
+      // Moon
+      ctx.beginPath();
+      ctx.arc(discX, discY, 14, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(220,230,255,${(nite * 0.55).toFixed(3)})`;
+      ctx.fill();
+    } else {
+      // Sun glow
+      const sunA = day * 0.45 + eve * 0.30;
+      const sg = ctx.createRadialGradient(discX, discY, 0, discX, discY, H * 0.35);
+      sg.addColorStop(0,    `rgba(255,${(200+eve*30)|0},${(80-eve*40)|0},${sunA.toFixed(3)})`);
+      sg.addColorStop(0.15, `rgba(255,${(160+eve*40)|0},60,${(sunA*0.35).toFixed(3)})`);
+      sg.addColorStop(1,    'rgba(0,0,0,0)');
+      ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+    }
+
+    // Horizon path glow (the "road" — a subtle bright strip)
+    const pathY = H * 0.63;
+    const pathG = ctx.createLinearGradient(0, pathY - 8, 0, pathY + 18);
+    pathG.addColorStop(0, `rgba(${(180+day*50)|0},${(200+day*40)|0},${(100+day*30)|0},${(0.08+day*0.10).toFixed(3)})`);
+    pathG.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = pathG;
+    ctx.fillRect(0, pathY - 8, W, 26);
   }
 
   // ── 集中 — Lissajous Flow (time-aware) ───────────────────────────────────
@@ -3897,7 +4120,7 @@ class HealingApp {
     const rail = document.getElementById('sit-rail');
     rail.innerHTML = '';
     const cat = this._uiCat;
-    const moods = cat === 'sleep' ? SLEEP_MOODS : cat === 'presleep' ? PRESLEEP_MOODS : MOOD_LABELS;
+    const moods = cat === 'sleep' ? SLEEP_MOODS : cat === 'presleep' ? PRESLEEP_MOODS : cat === 'walk' ? WALK_MOODS : MOOD_LABELS;
     moods.forEach((mood, idx) => {
       const btn = document.createElement('button');
       btn.className   = 'sit-chip' + (idx === this._uiMood ? ' active' : '');
@@ -3919,6 +4142,7 @@ class HealingApp {
       meditation:'θ波で深い瞑想状態へ',
       sleep:     'δ波で深い眠りへ',
       presleep: 'お風呂から眠りへ、体と心をほどいていく',
+      walk: '自然の音に包まれて、一歩一歩をリフレッシュ',
     };
     const el = document.getElementById('mode-sub');
     if (el) el.textContent = TAGS[this._uiCat] || '';
