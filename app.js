@@ -1831,6 +1831,11 @@ class HealingApp {
     this._weatherCategory   = 'clear';   // 'clear' | 'cloudy' | 'rainy'
     this._weatherFetchedAt  = 0;
 
+    // Sunrise / Sunset (for icon color)
+    this._sunriseHour       = 6.0;   // default until geo fetch
+    this._sunsetHour        = 18.0;
+    this._iconBrightTimer   = null;
+
     this._initUI();
     this._initBgCanvas();
   }
@@ -3272,13 +3277,26 @@ class HealingApp {
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 300000 });
       });
       const { latitude: lat, longitude: lon } = pos.coords;
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=weather_code&timezone=auto`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=weather_code&daily=sunrise,sunset&timezone=auto`;
       const res  = await fetch(url);
       const data = await res.json();
+
+      // Weather code → category
       const code = data.current?.weather_code ?? 0;
       if      (code <= 1)  this._weatherCategory = 'clear';
       else if (code <= 48) this._weatherCategory = 'cloudy';
       else                 this._weatherCategory = 'rainy';
+
+      // Sunrise / Sunset → store as decimal hours
+      if (data.daily?.sunrise?.[0]) {
+        const d = new Date(data.daily.sunrise[0]);
+        this._sunriseHour = d.getHours() + d.getMinutes() / 60;
+      }
+      if (data.daily?.sunset?.[0]) {
+        const d = new Date(data.daily.sunset[0]);
+        this._sunsetHour = d.getHours() + d.getMinutes() / 60;
+      }
+
       this._weatherFetchedAt = Date.now();
     } catch (_) {
       // Fallback: rough time-of-day guess (morning tends clear)
@@ -3286,6 +3304,60 @@ class HealingApp {
       this._weatherCategory = (h >= 6 && h < 18) ? 'clear' : 'cloudy';
     }
     this._updateMelodyBtnLabel();
+    this._applyIconBrightness();
+  }
+
+  // ── Icon brightness: sunrise/sunset aware ─────────────────────────────────
+
+  // Smoothly interpolate CSS filter on .mode-tab-icon by time of day
+  _applyIconBrightness() {
+    const hour = this._getHour();
+    const f    = this._getIconFilter(hour, this._sunriseHour, this._sunsetHour);
+    const filterStr = `brightness(${f.b.toFixed(2)}) sepia(${f.s.toFixed(2)}) hue-rotate(${f.h.toFixed(0)}deg) saturate(${f.sat.toFixed(2)})`;
+    document.querySelectorAll('.mode-tab-icon').forEach(el => {
+      el.style.transition = 'filter 90s linear';
+      el.style.filter     = filterStr;
+    });
+  }
+
+  // Returns { b:brightness, s:sepia, h:hue-rotate, sat:saturate } for given hour
+  _getIconFilter(hour, rise, set) {
+    // Lerp helper
+    const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
+
+    // Keyframes: [hour, brightness, sepia, hueRotate, saturate]
+    // hue-rotate shifts warm→cool: 0=natural, 340-360=warm orange, 200-230=cool blue
+    const kf = [
+      [0,           0.30, 0.20, 215, 0.70],   // midnight       — dim, cold blue
+      [rise - 1.5,  0.35, 0.28, 225, 0.75],   // pre-dawn       — dark blue-purple
+      [rise - 0.4,  0.55, 0.50, 355, 1.10],   // civil twilight — warm pink glow
+      [rise + 0.5,  0.75, 0.35, 350, 1.20],   // sunrise        — golden orange
+      [rise + 2.0,  0.90, 0.12, 352, 1.10],   // morning        — warm gold fading
+      [(rise+set)/2,1.00, 0.00,   0, 1.00],   // solar noon     — natural, full
+      [set - 2.0,   0.92, 0.10, 350, 1.05],   // afternoon      — slightly warm
+      [set - 0.4,   0.75, 0.42, 348, 1.15],   // sunset         — amber glow
+      [set + 0.5,   0.52, 0.32, 355, 0.90],   // dusk           — warm purple
+      [set + 1.5,   0.35, 0.22, 220, 0.75],   // early night    — cool, dim
+      [24,          0.30, 0.20, 215, 0.70],   // midnight (wrap)
+    ];
+
+    // Find surrounding keyframes
+    let p = kf[0], n = kf[kf.length - 1];
+    for (let i = 0; i < kf.length - 1; i++) {
+      if (hour >= kf[i][0] && hour <= kf[i + 1][0]) {
+        p = kf[i]; n = kf[i + 1]; break;
+      }
+    }
+    const t = (n[0] - p[0]) > 0 ? (hour - p[0]) / (n[0] - p[0]) : 0;
+    // Smooth-step easing
+    const ease = t * t * (3 - 2 * t);
+
+    return {
+      b:   lerp(p[1], n[1], ease),
+      s:   lerp(p[2], n[2], ease),
+      h:   lerp(p[3], n[3], ease),
+      sat: lerp(p[4], n[4], ease),
+    };
   }
 
   // Generate time-of-day + weather adaptive piano patterns
@@ -4599,6 +4671,12 @@ class HealingApp {
 
     // ── Show initial canvas animation for the selected mode ──
     this._startVisuals(this._uiCat);
+
+    // ── Icon brightness: apply immediately, then every 60 s ──
+    this._applyIconBrightness();
+    this._iconBrightTimer = setInterval(() => this._applyIconBrightness(), 60_000);
+    // Fetch geo → accurate sunrise/sunset (async, non-blocking)
+    this._fetchWeather();
   }
 }
 
