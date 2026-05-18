@@ -1826,6 +1826,11 @@ class HealingApp {
     this._breathGuideActive = false;
     this._breathTimers      = [];
 
+    // Melody ON/OFF
+    this._melodyOn          = false;
+    this._weatherCategory   = 'clear';   // 'clear' | 'cloudy' | 'rainy'
+    this._weatherFetchedAt  = 0;
+
     this._initUI();
     this._initBgCanvas();
   }
@@ -2888,7 +2893,13 @@ class HealingApp {
           g.connect(this.dryBus);
           g.connect(this.reverbSend);
           this.layers.push({ name: def.name, icon: def.icon, gainNode: g, nodes: [], defaultVol: def.vol });
-          this._schedulePianoNotes(def.patterns, def.bpm, g, def.startDelay || 5);
+          if (this._melodyOn) {
+            const hour = this._getHour();
+            const { patterns: mPat, bpm: mBpm } = this._getMelodyPianoPatterns(cat, hour, this._weatherCategory);
+            this._schedulePianoNotes(mPat, mBpm, g, def.startDelay || 5);
+          } else {
+            this._schedulePianoNotes(def.patterns, def.bpm, g, def.startDelay || 5);
+          }
           break;
         }
       }
@@ -3157,7 +3168,16 @@ class HealingApp {
     saveBtn.title = '現在のバランスを保存';
     saveBtn.addEventListener('click', () => this._saveCustomPreset());
 
+    // Melody toggle button
+    const melodyBtn = document.createElement('button');
+    melodyBtn.id = 'melody-btn';
+    melodyBtn.className = 'melody-btn' + (this._melodyOn ? ' active' : '');
+    melodyBtn.title = this._melodyOn ? '旋律ON' : '旋律OFF';
+    melodyBtn.innerHTML = '🎵';
+    melodyBtn.addEventListener('click', () => this._toggleMelody());
+
     row.appendChild(pills);
+    row.appendChild(melodyBtn);
     row.appendChild(saveBtn);
   }
 
@@ -3212,6 +3232,136 @@ class HealingApp {
     }
     const activePill = document.querySelector('.preset-pill.active');
     if (activePill) activePill.classList.add('has-custom');
+  }
+
+  // ── Melody ON/OFF ─────────────────────────────────────────────────────────
+
+  _toggleMelody() {
+    this._melodyOn = !this._melodyOn;
+    this._updateMelodyBtnLabel();
+    // Fetch weather immediately when turning on
+    if (this._melodyOn) this._fetchWeather();
+    // Restart audio with new melody mode
+    if (this.isPlaying) {
+      this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.10);
+      this._stopLayersOnly();
+      this._startCategory(this._uiCat, this._uiMood, 1.0);
+    }
+  }
+
+  _updateMelodyBtnLabel() {
+    const btn = document.getElementById('melody-btn');
+    if (!btn) return;
+    btn.classList.toggle('active', this._melodyOn);
+    if (this._melodyOn) {
+      const emoji = { clear: '☀️', cloudy: '☁️', rainy: '🌧️' }[this._weatherCategory] || '';
+      btn.innerHTML = `🎵${emoji}`;
+      btn.title = `旋律ON — ${emoji} ${this._weatherCategory === 'clear' ? '晴れ' : this._weatherCategory === 'cloudy' ? '曇り' : '雨'}`;
+    } else {
+      btn.innerHTML = '🎵';
+      btn.title = '旋律OFF';
+    }
+  }
+
+  async _fetchWeather() {
+    // Cache 30 minutes
+    if (Date.now() - this._weatherFetchedAt < 30 * 60 * 1000) return;
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        if (!navigator.geolocation) { reject(new Error('no geolocation')); return; }
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 300000 });
+      });
+      const { latitude: lat, longitude: lon } = pos.coords;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=weather_code&timezone=auto`;
+      const res  = await fetch(url);
+      const data = await res.json();
+      const code = data.current?.weather_code ?? 0;
+      if      (code <= 1)  this._weatherCategory = 'clear';
+      else if (code <= 48) this._weatherCategory = 'cloudy';
+      else                 this._weatherCategory = 'rainy';
+      this._weatherFetchedAt = Date.now();
+    } catch (_) {
+      // Fallback: rough time-of-day guess (morning tends clear)
+      const h = this._getHour();
+      this._weatherCategory = (h >= 6 && h < 18) ? 'clear' : 'cloudy';
+    }
+    this._updateMelodyBtnLabel();
+  }
+
+  // Generate time-of-day + weather adaptive piano patterns
+  _getMelodyPianoPatterns(cat, hour, weather) {
+    // ── Time segment ──
+    let seg, bpm;
+    if      (hour <  5) { seg = 0; bpm = 4;  }   // predawn   — sparse, minimal
+    else if (hour < 10) { seg = 1; bpm = 9;  }   // morning   — ascending, hopeful
+    else if (hour < 17) { seg = 2; bpm = 11; }   // day       — balanced, clear
+    else if (hour < 21) { seg = 3; bpm = 7;  }   // evening   — descending, warm
+    else                { seg = 4; bpm = 5;  }   // night     — sparse, intimate
+
+    // ── Weather BPM modifier ──
+    if (weather === 'clear') bpm = Math.round(bpm * 1.10);
+    if (weather === 'rainy') bpm = Math.max(3, Math.round(bpm * 0.85));
+
+    // ── Note pools per category (Just Intonation) ──
+    const pools = {
+      morning:    { low:[_.C3,_.E3,_.G3],             mid:[_.C4,_.D4,_.E4,_.G4],       high:[_.C5,_.D5,_.E5,_.G5] },
+      relax:      { low:[_.C3,_.F3,_.G3,_.A3],        mid:[_.C4,_.F4,_.G4,_.A4],       high:[_.C5,_.D5,_.G5]      },
+      meditation: { low:[_.C3,_.G3,_.A3],              mid:[_.C4,_.E4,_.G4,_.A4],       high:[_.C5,_.E5,_.A5]      },
+      focus:      { low:[_.C3,_.D3,_.G3],              mid:[_.C4,_.D4,_.G4,_.A4],       high:[_.C5,_.D5,_.G5]      },
+      presleep:   { low:[_.C3,_.F3,_.A3],              mid:[_.C4,_.F4,_.A4],            high:[_.C5,_.D5]           },
+      sleep:      { low:[_.C2,_.G2,_.C3],              mid:[_.C3,_.G3,_.A3],            high:[_.C4,_.E4]           },
+      walk:       { low:[_.C3,_.G3,_.A3],              mid:[_.C4,_.D4,_.E4,_.G4],       high:[_.C5,_.D5,_.E5]      },
+    };
+    const pool = pools[cat] || pools.relax;
+
+    // ── Register weight [low, mid, high] by time segment ──
+    const regW = [
+      [0.60, 0.35, 0.05],   // predawn
+      [0.10, 0.50, 0.40],   // morning
+      [0.20, 0.50, 0.30],   // day
+      [0.30, 0.55, 0.15],   // evening
+      [0.50, 0.45, 0.05],   // night
+    ][seg].slice();
+
+    // Weather register shift
+    if (weather === 'clear') { regW[0] = Math.max(0, regW[0] - 0.10); regW[2] = Math.min(1, regW[2] + 0.10); }
+    if (weather === 'rainy') { regW[2] = Math.max(0, regW[2] - 0.10); regW[0] = Math.min(1, regW[0] + 0.10); }
+
+    // ── Note density (fraction of non-null beats) ──
+    const baseDensity = [0.28, 0.55, 0.50, 0.42, 0.25][seg];
+    const density = baseDensity * (weather === 'rainy' ? 0.82 : weather === 'clear' ? 1.08 : 1.0);
+
+    // ── Seeded RNG — same seed = same melody per (cat, seg, weather) ──
+    const catIdx = ['morning','relax','meditation','focus','presleep','sleep','walk'].indexOf(cat);
+    const wIdx   = { clear: 0, cloudy: 1, rainy: 2 }[weather] || 1;
+    let seed = (catIdx * 1000 + seg * 100 + wIdx * 10 + 7) | 0;
+    const rng = () => {
+      seed = ((seed * 1664525 + 1013904223) & 0x7fffffff) >>> 0;
+      return seed / 0x7fffffff;
+    };
+
+    const pickNote = () => {
+      const r = rng();
+      let reg;
+      if      (r < regW[0])           reg = pool.low;
+      else if (r < regW[0] + regW[1]) reg = pool.mid;
+      else                             reg = pool.high;
+      return reg[Math.floor(rng() * reg.length)];
+    };
+
+    // ── Build 4 patterns × 8 beats ──
+    const patterns = [];
+    for (let p = 0; p < 4; p++) {
+      const pat = [];
+      for (let n = 0; n < 8; n++) {
+        pat.push(rng() < density ? pickNote() : null);
+      }
+      // Guarantee at least one note per pattern
+      if (!pat.some(Boolean)) pat[Math.floor(rng() * 8)] = pickNote();
+      patterns.push(pat);
+    }
+
+    return { patterns, bpm };
   }
 
   // ── Visual Engine ─────────────────────────────────────────────────────────

@@ -270,6 +270,28 @@ html, body {
   color: rgba(125,211,252,0.92);
 }
 
+/* Melody toggle button */
+.melody-btn {
+  padding: 0.16rem 0.40rem;
+  border-radius: 0.38rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-lo);
+  font-size: 0.72rem; font-family: inherit;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  letter-spacing: 0.02em;
+  transition: all 0.20s;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1;
+}
+.melody-btn:active { transform: scale(0.92); }
+.melody-btn.active {
+  background: rgba(240,171,252,0.14);
+  border-color: rgba(240,171,252,0.40);
+  color: rgba(240,171,252,0.95);
+  box-shadow: 0 0 8px rgba(240,171,252,0.20);
+}
+
 /* ── ⑤ Layer panel ── */
 .layer-panel {
   flex-shrink: 0;
