@@ -101,6 +101,64 @@ function computeAdditiveBuffer(ac, freq, durationSec = 4.5) {
   return buf;
 }
 
+function computePianoBuffer(ac, freq, velocity = 0.7, durationSec = 5.5) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * durationSec);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+
+  // Piano partials: brighter than harp, with dual-decay envelope
+  const partials = [
+    [1, 0.58, 0.6,  0.055],  // [harmonic, amp, fastDecay/s, slowDecay/s]
+    [2, 0.32, 1.4,  0.12 ],
+    [3, 0.17, 2.6,  0.22 ],
+    [4, 0.09, 4.2,  0.38 ],
+    [5, 0.05, 6.5,  0.60 ],
+    [6, 0.027,9.5,  0.90 ],
+    [7, 0.013,13.0, 1.30 ],
+    [8, 0.006,17.0, 1.80 ],
+  ];
+
+  // Piano strings are stiffer than harp → higher inharmonicity
+  const B = 0.00025 * Math.max(1, freq / 261.63);
+  const phi = Math.random() * Math.PI * 2;
+  const fadeIn = Math.round(sr * 0.002);  // 2 ms crisp attack
+
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    let s = 0;
+
+    partials.forEach(([n, amp, fastDc, slowDc]) => {
+      const f = freq * n * Math.sqrt(1 + B * n * n);
+      if (f >= sr * 0.45) return;
+      // Dual-decay: fast initial decay blends into slow sustain
+      const env = amp * (0.45 * Math.exp(-fastDc * t) + 0.55 * Math.exp(-slowDc * t));
+      s += env * Math.sin(2 * Math.PI * f * t + phi * n * 0.04);
+    });
+
+    // Hammer transient: sharp noise burst at attack
+    if (i < Math.round(sr * 0.018)) {
+      const atkNorm = i / Math.round(sr * 0.018);
+      s += (Math.random() * 2 - 1) * 0.10 * velocity * Math.exp(-atkNorm * 8);
+    }
+
+    if (i < fadeIn) s *= i / fadeIn;
+    d[i] = s * velocity;
+  }
+
+  // Normalize with fade-out tail
+  let peak = 0;
+  for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
+  if (peak > 0.01) {
+    const fo = Math.min(sr * 0.6, len);
+    for (let i = 0; i < len; i++) {
+      d[i] = d[i] / peak * 0.72;
+      if (i > len - fo) d[i] *= (len - i) / fo;
+    }
+  }
+  return buf;
+}
+
 // ─── Presets ────────────────────────────────────────────────────────────────
 
 const MOOD_LABELS = [
@@ -127,6 +185,29 @@ const PRESLEEP_MOODS = [
   { id: 'stretch',   label: 'ストレッチ',    icon: '🧘', desc: '体をほぐして眠りへ' },
 ];
 
+// ─── Just Intonation Frequencies ────────────────────────────────────────────
+// Root: C4 = 264 Hz → A4 = 440 Hz (standard pitch) → C5 = 528 Hz (solfeggio)
+// All intervals are pure integer ratios. No equal-temperament approximations.
+const JI = {
+  // Octave 2
+  C2: 66,   F2: 88,   G2: 99,   A2: 110,
+  // Octave 3
+  C3: 132,  D3: 148.5, E3: 165,  F3: 176,  G3: 198,  A3: 220,  B3: 247.5,
+  // Octave 3 sharps (A major / D major context)
+  Cs3: 137.5, Fs3: 183.33, Gs3: 206.25,
+  // Octave 4
+  C4: 264,  D4: 297,  E4: 330,  F4: 352,  G4: 396,  A4: 440,  B4: 495,
+  // Octave 4 sharps
+  Cs4: 275,  Fs4: 366.67, Gs4: 412.5,
+  // D major F#4 (= D4 × 5/4 = 297 × 5/4 = 371.25, slightly different from A-major F#4=366.67)
+  Fs4d: 371.25,
+  // Octave 5
+  C5: 528,  D5: 594,  E5: 660,  G5: 792,  A5: 880,
+  Cs5: 550, Fs5: 733.33,
+};
+// Convenient aliases
+const _ = JI;  // so presets can write _.C4, _.E4, etc.
+
 const PRESETS = {
   meditation: [
     // 0: 家で静かに — 深い静寂: θ波 + 528Hz + 弦楽パッド + ハープ + ボウル
@@ -148,27 +229,41 @@ const PRESETS = {
         { name:'スタンダード', layers: [
           { type:'binaural',  name:'バイノーラル θ波 6Hz', icon:'〜', base:200, beat:6, vol:0.52 },
           { type:'solfeggio', name:'528Hz ソルフェジオ',    icon:'✦',  vol:0.60 },
-          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.62 },
+          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396], vol:0.62 },
           { type:'harp',      name:'ハープ',                icon:'🪕',
             patterns:[
-              [130.81, null, 196, null, 246.94],
-              [null, 164.81, null, 196, null],
-              [196, null, 246.94, null, 130.81],
-              [null, 130.81, null, 164.81, null],
+              [132, null, 198, null, 247.5],
+              [null, 165, null, 198, null],
+              [198, null, 247.5, null, 132],
+              [null, 132, null, 165, null],
             ], bpm:20, startDelay:4, vol:0.46 },
+          { type:'piano', name:'ソフトピアノ', icon:'🎹',
+            patterns:[
+              [132,  null, null, null, 264,  null, null, null],
+              [null, null, 198,  null, null, null, 330,  null],
+              [264,  null, null, null, 198,  null, null, 132 ],
+              [null, 165,  null, null, null, 247.5,null, null],
+            ], bpm:9, startDelay:7, vol:0.34 },
           { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:24000, vol:0.56 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural',  name:'バイノーラル θ波 6Hz', icon:'〜', base:200, beat:6, vol:0.52 },
           { type:'solfeggio', name:'528Hz ソルフェジオ',    icon:'✦',  vol:0.60 },
-          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.62 },
+          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396], vol:0.62 },
           { type:'harp',      name:'ハープ',                icon:'🪕',
             patterns:[
-              [130.81, null, 196, null, 246.94],
-              [null, 164.81, null, 196, null],
-              [196, null, 246.94, null, 130.81],
-              [null, 130.81, null, 164.81, null],
+              [132, null, 198, null, 247.5],
+              [null, 165, null, 198, null],
+              [198, null, 247.5, null, 132],
+              [null, 132, null, 165, null],
             ], bpm:20, startDelay:4, vol:0.46 },
+          { type:'piano', name:'ソフトピアノ', icon:'🎹',
+            patterns:[
+              [132,  null, null, null, 264,  null, null, null],
+              [null, null, 198,  null, null, null, 330,  null],
+              [264,  null, null, null, 198,  null, null, 132 ],
+              [null, 165,  null, null, null, 247.5,null, null],
+            ], bpm:9, startDelay:7, vol:0.34 },
           { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:24000, vol:0.56 },
           { type:'ocean', name:'波の音', icon:'🌊', vol:0.22 },
         ]},
@@ -192,26 +287,26 @@ const PRESETS = {
         { name:'スタンダード', layers: [
           { type:'binaural',  name:'バイノーラル θ波 7Hz', icon:'〜', base:200, beat:7, vol:0.58 },
           { type:'noise',     name:'ブラウンノイズ',        icon:'🌫️', noiseType:'brown', vol:0.40 },
-          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.58 },
+          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396], vol:0.58 },
           { type:'harp',      name:'ハープ',                icon:'🪕',
             patterns:[
-              [130.81, 196, null, 246.94, null],
-              [null, 164.81, 196, null, 130.81],
-              [196, null, 246.94, 164.81, null],
-              [130.81, null, 196, null, 246.94],
+              [132, 198, null, 247.5, null],
+              [null, 165, 198, null, 132],
+              [198, null, 247.5, 165, null],
+              [132, null, 198, null, 247.5],
             ], bpm:22, startDelay:5, vol:0.42 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦', vol:0.52 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural',  name:'バイノーラル θ波 7Hz', icon:'〜', base:200, beat:7, vol:0.58 },
           { type:'noise',     name:'ブラウンノイズ',        icon:'🌫️', noiseType:'brown', vol:0.40 },
-          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.58 },
+          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396], vol:0.58 },
           { type:'harp',      name:'ハープ',                icon:'🪕',
             patterns:[
-              [130.81, 196, null, 246.94, null],
-              [null, 164.81, 196, null, 130.81],
-              [196, null, 246.94, 164.81, null],
-              [130.81, null, 196, null, 246.94],
+              [132, 198, null, 247.5, null],
+              [null, 165, 198, null, 132],
+              [198, null, 247.5, 165, null],
+              [132, null, 198, null, 247.5],
             ], bpm:22, startDelay:5, vol:0.42 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦', vol:0.52 },
           { type:'rain', name:'雨音', icon:'🌧️', vol:0.28 },
@@ -238,12 +333,12 @@ const PRESETS = {
           { type:'noise',    name:'ブラウンノイズ',        icon:'🌫️', noiseType:'brown', vol:0.34 },
           { type:'harp',     name:'ハープ',                icon:'🪕',
             patterns:[
-              [130.81, null, 196, null, null],
-              [null, 164.81, null, 246.94, null],
-              [196, null, null, 164.81, null],
-              [null, 130.81, 196, null, 164.81],
+              [132, null, 198, null, null],
+              [null, 165, null, 247.5, null],
+              [198, null, null, 165, null],
+              [null, 132, 198, null, 165],
             ], bpm:18, startDelay:3, vol:0.50 },
-          { type:'pad',  name:'弦楽器パッド',  icon:'🎻', freqs:[261.63,329.63,392], vol:0.54 },
+          { type:'pad',  name:'弦楽器パッド',  icon:'🎻', freqs:[264,330,396], vol:0.54 },
           { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:30000, vol:0.48 },
         ]},
         { name:'ディープ', layers: [
@@ -251,12 +346,12 @@ const PRESETS = {
           { type:'noise',    name:'ブラウンノイズ',        icon:'🌫️', noiseType:'brown', vol:0.34 },
           { type:'harp',     name:'ハープ',                icon:'🪕',
             patterns:[
-              [130.81, null, 196, null, null],
-              [null, 164.81, null, 246.94, null],
-              [196, null, null, 164.81, null],
-              [null, 130.81, 196, null, 164.81],
+              [132, null, 198, null, null],
+              [null, 165, null, 247.5, null],
+              [198, null, null, 165, null],
+              [null, 132, 198, null, 165],
             ], bpm:18, startDelay:3, vol:0.50 },
-          { type:'pad',  name:'弦楽器パッド',  icon:'🎻', freqs:[261.63,329.63,392], vol:0.54 },
+          { type:'pad',  name:'弦楽器パッド',  icon:'🎻', freqs:[264,330,396], vol:0.54 },
           { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:30000, vol:0.48 },
           { type:'rain', name:'雨音', icon:'🌧️', vol:0.26 },
         ]},
@@ -281,26 +376,26 @@ const PRESETS = {
         { name:'スタンダード', layers: [
           { type:'binaural',  name:'バイノーラル θ波 6Hz', icon:'〜', base:200, beat:6, vol:0.50 },
           { type:'solfeggio', name:'528Hz ソルフェジオ',    icon:'✦',  vol:0.64 },
-          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.68 },
+          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396,528], vol:0.68 },
           { type:'harp',      name:'ハープ',                icon:'🪕',
             patterns:[
-              [130.81, 164.81, 196, null, 246.94],
-              [261.63, null, 196, 164.81, null],
-              [130.81, null, 246.94, null, 196],
-              [164.81, 196, null, 246.94, null],
+              [132, 165, 198, null, 247.5],
+              [264, null, 198, 165, null],
+              [132, null, 247.5, null, 198],
+              [165, 198, null, 247.5, null],
             ], bpm:18, startDelay:5, vol:0.48 },
           { type:'ocean', name:'波の音', icon:'🌊', vol:0.30 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural',  name:'バイノーラル θ波 6Hz', icon:'〜', base:200, beat:6, vol:0.50 },
           { type:'solfeggio', name:'528Hz ソルフェジオ',    icon:'✦',  vol:0.64 },
-          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.68 },
+          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396,528], vol:0.68 },
           { type:'harp',      name:'ハープ',                icon:'🪕',
             patterns:[
-              [130.81, 164.81, 196, null, 246.94],
-              [261.63, null, 196, 164.81, null],
-              [130.81, null, 246.94, null, 196],
-              [164.81, 196, null, 246.94, null],
+              [132, 165, 198, null, 247.5],
+              [264, null, 198, 165, null],
+              [132, null, 247.5, null, 198],
+              [165, 198, null, 247.5, null],
             ], bpm:18, startDelay:5, vol:0.48 },
           { type:'ocean', name:'波の音', icon:'🌊', vol:0.30 },
           { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:28000, vol:0.42 },
@@ -325,26 +420,33 @@ const PRESETS = {
         ]},
         { name:'スタンダード', layers: [
           { type:'binaural',  name:'バイノーラル θ波 8Hz', icon:'〜', base:220, beat:8, vol:0.55 },
-          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.56 },
+          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396], vol:0.56 },
           { type:'harp',      name:'ハープ',                icon:'🪕',
             patterns:[
-              [196, 246.94, 329.63, null, 392],
-              [261.63, 329.63, null, 392, 329.63],
-              [246.94, null, 329.63, 261.63, null],
-              [196, 261.63, null, 329.63, null],
+              [198, 247.5, 330, null, 396],
+              [264, 330, null, 396, 330],
+              [247.5, null, 330, 264, null],
+              [198, 264, null, 330, null],
             ], bpm:26, startDelay:3, vol:0.50 },
+          { type:'piano', name:'ソフトピアノ', icon:'🎹',
+            patterns:[
+              [132,  null, null, null, 264,  null, null, null],
+              [null, null, 198,  null, null, null, 330,  null],
+              [264,  null, null, null, 198,  null, null, 132 ],
+              [null, 165,  null, null, null, 247.5,null, null],
+            ], bpm:9, startDelay:7, vol:0.34 },
           { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:18000, vol:0.50 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.58 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural',  name:'バイノーラル θ波 8Hz', icon:'〜', base:220, beat:8, vol:0.55 },
-          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392], vol:0.56 },
+          { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396], vol:0.56 },
           { type:'harp',      name:'ハープ',                icon:'🪕',
             patterns:[
-              [196, 246.94, 329.63, null, 392],
-              [261.63, 329.63, null, 392, 329.63],
-              [246.94, null, 329.63, 261.63, null],
-              [196, 261.63, null, 329.63, null],
+              [198, 247.5, 330, null, 396],
+              [264, 330, null, 396, 330],
+              [247.5, null, 330, 264, null],
+              [198, 264, null, 330, null],
             ], bpm:26, startDelay:3, vol:0.50 },
           { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:18000, vol:0.50 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.58 },
@@ -372,7 +474,7 @@ const PRESETS = {
         ]},
         { name:'スタンダード', layers: [
           { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.50 },
-          { type:'organ',     name:'オルガン',           icon:'🎹', baseFreq:98.0, vol:0.52 },
+          { type:'organ',     name:'オルガン',           icon:'🎹', baseFreq:99.0, vol:0.52 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.54 },
           { type:'harp',      name:'ハープ',            icon:'🪕',
             patterns:[
@@ -381,15 +483,29 @@ const PRESETS = {
               [176, null, null, 264, null],
               [132, null, 198, null, null],
             ], bpm:15, startDelay:7, vol:0.38 },
+          { type:'piano', name:'ソフトピアノ', icon:'🎹',
+            patterns:[
+              [132,  null, null, null, null, null, 198,  null],
+              [null, null, null, 165,  null, null, null, null],
+              [132,  null, null, null, 198,  null, null, null],
+              [null, null, 132,  null, null, null, null, 165 ],
+            ], bpm:7, startDelay:10, vol:0.32 },
           { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:22000, vol:0.46 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.50 },
-          { type:'organ',     name:'オルガン',           icon:'🎹', baseFreq:98.0, vol:0.52 },
+          { type:'organ',     name:'オルガン',           icon:'🎹', baseFreq:99.0, vol:0.52 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.54 },
           { type:'harp',      name:'ハープ',             icon:'🪕',
             patterns:[[132,null,176,null,null],[null,198,null,132,null],[176,null,null,264,null],[132,null,198,null,null]],
             bpm:15, startDelay:7, vol:0.38 },
+          { type:'piano', name:'ソフトピアノ', icon:'🎹',
+            patterns:[
+              [132,  null, null, null, null, null, 198,  null],
+              [null, null, null, 165,  null, null, null, null],
+              [132,  null, null, null, 198,  null, null, null],
+              [null, null, 132,  null, null, null, null, 165 ],
+            ], bpm:7, startDelay:10, vol:0.32 },
           { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:22000, vol:0.46 },
           { type:'wind',      name:'風の音',              icon:'🍃', vol:0.16 },
         ]},
@@ -440,7 +556,7 @@ const PRESETS = {
           { type:'harp',     name:'ハープ',            icon:'🪕',
             patterns:[[132,null,null,176,null],[null,null,198,null,null],[176,null,132,null,null],[null,198,null,null,176]],
             bpm:15, startDelay:10, vol:0.32 },
-          { type:'organ',    name:'オルガン',           icon:'🎹', baseFreq:65.41, vol:0.28 },
+          { type:'organ',    name:'オルガン',           icon:'🎹', baseFreq:66.0, vol:0.28 },
         ]},
         { name: 'ジャーニー', journey: true, layers: [
           { type:'binaural', name:'バイノーラル α→δ旅', icon:'〜', base:264, beat:8, driftTo:1.0, driftDuration:3600, vol:0.55 },
@@ -498,19 +614,19 @@ const PRESETS = {
         { name:'スタンダード', layers: [
           { type:'binaural', name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:6, driftTo:2, driftDuration:2400, vol:0.44 },
           { type:'fire',     name:'焚き火',             icon:'🔥', vol:0.62 },
-          { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:65.41, vol:0.46 },
+          { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:66.0, vol:0.46 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural', name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:6, driftTo:2, driftDuration:2400, vol:0.44 },
           { type:'fire',     name:'焚き火',             icon:'🔥', vol:0.55 },
-          { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:65.41, vol:0.46 },
+          { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:66.0, vol:0.46 },
           { type:'noise',    name:'ブラウンノイズ',      icon:'🌫️', noiseType:'brown', vol:0.24 },
           { type:'bowl',     name:'チベタンボウル',      icon:'🔔', interval:28000, vol:0.36 },
         ]},
         { name: 'ジャーニー', journey: true, layers: [
           { type:'binaural', name:'バイノーラル α→δ旅', icon:'〜', base:264, beat:8, driftTo:1.0, driftDuration:3600, vol:0.50 },
           { type:'fire',     name:'焚き火',             icon:'🔥', vol:0.46 },
-          { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:65.41, vol:0.36 },
+          { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:66.0, vol:0.36 },
           { type:'noise',    name:'ブラウンノイズ',       icon:'🌫️', noiseType:'brown', vol:0.22 },
         ]},
       ]
@@ -584,27 +700,41 @@ const PRESETS = {
         { name:'スタンダード', layers: [
           { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.50 },
           { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.32 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.60 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440], vol:0.60 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [146.83, 220, null, 293.66, null],
-              [185, null, 220, null, 369.99],
-              [293.66, 220, null, 185, 220],
-              [null, 146.83, 220, null, 293.66],
+              [148.5, 220, null, 293.66, null],
+              [183.33, null, 220, null, 367.08],
+              [293.66, 220, null, 183.33, 220],
+              [null, 148.5, 220, null, 293.66],
             ], bpm:35, startDelay:3, vol:0.46 },
+          { type:'piano', name:'ソフトピアノ', icon:'🎹',
+            patterns:[
+              [148.5, null, null, null, 293.66, null, null, null],
+              [null,  null, 220,  null, null,   null, 293.66,null],
+              [293.66,null, null, 220,  null,   null, null,  148.5],
+              [null,  148.5,null, null, null,   220,  null,  null ],
+            ], bpm:11, startDelay:6, vol:0.34 },
           { type:'stream', name:'川の流れ', icon:'💧', vol:0.28 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.50 },
           { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.32 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.60 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440], vol:0.60 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [146.83, 220, null, 293.66, null],
-              [185, null, 220, null, 369.99],
-              [293.66, 220, null, 185, 220],
-              [null, 146.83, 220, null, 293.66],
+              [148.5, 220, null, 293.66, null],
+              [183.33, null, 220, null, 367.08],
+              [293.66, 220, null, 183.33, 220],
+              [null, 148.5, 220, null, 293.66],
             ], bpm:35, startDelay:3, vol:0.46 },
+          { type:'piano', name:'ソフトピアノ', icon:'🎹',
+            patterns:[
+              [148.5, null, null, null, 293.66, null, null, null],
+              [null,  null, 220,  null, null,   null, 293.66,null],
+              [293.66,null, null, 220,  null,   null, null,  148.5],
+              [null,  148.5,null, null, null,   220,  null,  null ],
+            ], bpm:11, startDelay:6, vol:0.34 },
           { type:'stream', name:'川の流れ', icon:'💧', vol:0.28 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦', vol:0.34 },
         ]},
@@ -630,26 +760,26 @@ const PRESETS = {
           { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.55 },
           { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.48 },
           { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.35 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.54 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440], vol:0.54 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [146.83, null, 220, null, 293.66],
-              [null, 185, null, 220, null],
-              [220, null, 293.66, null, 185],
-              [null, 146.83, null, 220, null],
+              [148.5, null, 220, null, 293.66],
+              [null, 183.33, null, 220, null],
+              [220, null, 293.66, null, 183.33],
+              [null, 148.5, null, 220, null],
             ], bpm:35, startDelay:4, vol:0.40 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.55 },
           { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.48 },
           { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.35 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.54 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440], vol:0.54 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [146.83, null, 220, null, 293.66],
-              [null, 185, null, 220, null],
-              [220, null, 293.66, null, 185],
-              [null, 146.83, null, 220, null],
+              [148.5, null, 220, null, 293.66],
+              [null, 183.33, null, 220, null],
+              [220, null, 293.66, null, 183.33],
+              [null, 148.5, null, 220, null],
             ], bpm:35, startDelay:4, vol:0.40 },
           { type:'stream', name:'川の流れ', icon:'💧', vol:0.20 },
         ]},
@@ -675,26 +805,26 @@ const PRESETS = {
           { type:'binaural', name:'バイノーラル α波 12Hz', icon:'〜', base:200, beat:12, vol:0.58 },
           { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.46 },
           { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.30 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.54 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440], vol:0.54 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [146.83, 220, null, 293.66, null],
-              [220, null, 293.66, null, 185],
-              [null, 185, 220, null, 293.66],
-              [293.66, null, 220, 146.83, null],
+              [148.5, 220, null, 293.66, null],
+              [220, null, 293.66, null, 183.33],
+              [null, 183.33, 220, null, 293.66],
+              [293.66, null, 220, 148.5, null],
             ], bpm:30, startDelay:4, vol:0.38 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural', name:'バイノーラル α波 12Hz', icon:'〜', base:200, beat:12, vol:0.58 },
           { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.46 },
           { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.30 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.54 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440], vol:0.54 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [146.83, 220, null, 293.66, null],
-              [220, null, 293.66, null, 185],
-              [null, 185, 220, null, 293.66],
-              [293.66, null, 220, 146.83, null],
+              [148.5, 220, null, 293.66, null],
+              [220, null, 293.66, null, 183.33],
+              [null, 183.33, 220, null, 293.66],
+              [293.66, null, 220, 148.5, null],
             ], bpm:30, startDelay:4, vol:0.38 },
           { type:'stream', name:'川の流れ', icon:'💧', vol:0.22 },
         ]},
@@ -718,27 +848,34 @@ const PRESETS = {
         { name:'スタンダード', layers: [
           { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.50 },
           { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.26 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.64 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440,594], vol:0.64 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [146.83, 220, 185, null, 293.66],
-              [185, 220, null, 369.99, 293.66],
-              [293.66, null, 220, 185, null],
-              [null, 146.83, 220, null, 369.99],
+              [148.5, 220, 183.33, null, 293.66],
+              [183.33, 220, null, 367.08, 293.66],
+              [293.66, null, 220, 183.33, null],
+              [null, 148.5, 220, null, 367.08],
             ], bpm:30, startDelay:4, vol:0.48 },
           { type:'stream', name:'川の流れ', icon:'💧', vol:0.26 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.50 },
           { type:'noise',    name:'ピンクノイズ',           icon:'🌫️', noiseType:'pink', vol:0.26 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440,587.33], vol:0.64 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440,594], vol:0.64 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [146.83, 220, 185, null, 293.66],
-              [185, 220, null, 369.99, 293.66],
-              [293.66, null, 220, 185, null],
-              [null, 146.83, 220, null, 369.99],
+              [148.5, 220, 183.33, null, 293.66],
+              [183.33, 220, null, 367.08, 293.66],
+              [293.66, null, 220, 183.33, null],
+              [null, 148.5, 220, null, 367.08],
             ], bpm:30, startDelay:4, vol:0.48 },
+          { type:'piano', name:'ソフトピアノ', icon:'🎹',
+            patterns:[
+              [148.5, null, null, null, 293.66, null, null, null],
+              [null,  null, 220,  null, null,   null, 293.66,null],
+              [293.66,null, null, 220,  null,   null, null,  148.5],
+              [null,  148.5,null, null, null,   220,  null,  null ],
+            ], bpm:11, startDelay:6, vol:0.34 },
           { type:'stream', name:'川の流れ', icon:'💧', vol:0.26 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦', vol:0.38 },
         ]},
@@ -761,26 +898,26 @@ const PRESETS = {
         ]},
         { name:'スタンダード', layers: [
           { type:'binaural', name:'バイノーラル α波 14Hz', icon:'〜', base:220, beat:14, vol:0.55 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.58 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440], vol:0.58 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [220, 293.66, 369.99, null, 440],
-              [293.66, 369.99, null, 440, 369.99],
-              [185, 220, 293.66, null, 369.99],
-              [440, null, 369.99, 293.66, null],
+              [220, 293.66, 367.08, null, 440],
+              [293.66, 367.08, null, 440, 367.08],
+              [183.33, 220, 293.66, null, 367.08],
+              [440, null, 367.08, 293.66, null],
             ], bpm:42, startDelay:2, vol:0.54 },
           { type:'noise', name:'ピンクノイズ', icon:'🌫️', noiseType:'pink', vol:0.32 },
           { type:'bowl',  name:'チベタンボウル', icon:'🔔', interval:20000, vol:0.48 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural', name:'バイノーラル α波 14Hz', icon:'〜', base:220, beat:14, vol:0.55 },
-          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,369.99,440], vol:0.58 },
+          { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[293.66,367.08,440], vol:0.58 },
           { type:'harp',     name:'ハープ',                 icon:'🪕',
             patterns:[
-              [220, 293.66, 369.99, null, 440],
-              [293.66, 369.99, null, 440, 369.99],
-              [185, 220, 293.66, null, 369.99],
-              [440, null, 369.99, 293.66, null],
+              [220, 293.66, 367.08, null, 440],
+              [293.66, 367.08, null, 440, 367.08],
+              [183.33, 220, 293.66, null, 367.08],
+              [440, null, 367.08, 293.66, null],
             ], bpm:42, startDelay:2, vol:0.54 },
           { type:'noise', name:'ピンクノイズ', icon:'🌫️', noiseType:'pink', vol:0.32 },
           { type:'bowl',  name:'チベタンボウル', icon:'🔔', interval:20000, vol:0.48 },
@@ -819,27 +956,41 @@ PRESETS.morning = [
       ]},
       { name:'スタンダード', layers: [
         { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.48 },
-        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,277.18,329.63,440], vol:0.55 },
+        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,275,330,440], vol:0.55 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, 277.18, null, 329.63, null],
-            [null, 329.63, 440, null, 554.37],
-            [277.18, null, 329.63, null, 440],
-            [220, null, 277.18, 329.63, null],
+            [220, 275, null, 330, null],
+            [null, 330, 440, null, 550],
+            [275, null, 330, null, 440],
+            [220, null, 275, 330, null],
           ], bpm:20, startDelay:4, vol:0.48 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [110,  null, null, null, 220,  null, null, null],
+            [null, null, 165,  null, null, null, 275,  null],
+            [220,  null, null, 165,  null, null, null, 110 ],
+            [null, 110,  null, null, null, 220,  null, null],
+          ], bpm:12, startDelay:6, vol:0.34 },
         { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.40 },
         { type:'stream', name:'川の流れ',       icon:'💧', vol:0.24 },
       ]},
       { name:'ディープ', layers: [
         { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.48 },
-        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,277.18,329.63,440], vol:0.55 },
+        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,275,330,440], vol:0.55 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, 277.18, null, 329.63, null],
-            [null, 329.63, 440, null, 554.37],
-            [277.18, null, 329.63, null, 440],
-            [220, null, 277.18, 329.63, null],
+            [220, 275, null, 330, null],
+            [null, 330, 440, null, 550],
+            [275, null, 330, null, 440],
+            [220, null, 275, 330, null],
           ], bpm:20, startDelay:4, vol:0.48 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [110,  null, null, null, 220,  null, null, null],
+            [null, null, 165,  null, null, null, 275,  null],
+            [220,  null, null, 165,  null, null, null, 110 ],
+            [null, 110,  null, null, null, 220,  null, null],
+          ], bpm:12, startDelay:6, vol:0.34 },
         { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.40 },
         { type:'stream', name:'川の流れ',       icon:'💧', vol:0.24 },
         { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦', vol:0.28 },
@@ -866,26 +1017,26 @@ PRESETS.morning = [
         { type:'noise',    name:'ピンクノイズ',      icon:'🌫️', noiseType:'pink', vol:0.38 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, null, 329.63, null, 440],
-            [277.18, 329.63, null, 440, null],
-            [null, 220, 277.18, null, 329.63],
-            [329.63, null, 440, 329.63, null],
+            [220, null, 330, null, 440],
+            [275, 330, null, 440, null],
+            [null, 220, 275, null, 330],
+            [330, null, 440, 330, null],
           ], bpm:22, startDelay:4, vol:0.46 },
         { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.30 },
-        { type:'pad',   name:'弦楽器パッド',   icon:'🎻', freqs:[220,277.18,329.63,440], vol:0.48 },
+        { type:'pad',   name:'弦楽器パッド',   icon:'🎻', freqs:[220,275,330,440], vol:0.48 },
       ]},
       { name:'ディープ', layers: [
         { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.52 },
         { type:'noise',    name:'ピンクノイズ',      icon:'🌫️', noiseType:'pink', vol:0.38 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, null, 329.63, null, 440],
-            [277.18, 329.63, null, 440, null],
-            [null, 220, 277.18, null, 329.63],
-            [329.63, null, 440, 329.63, null],
+            [220, null, 330, null, 440],
+            [275, 330, null, 440, null],
+            [null, 220, 275, null, 330],
+            [330, null, 440, 330, null],
           ], bpm:22, startDelay:4, vol:0.46 },
         { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.30 },
-        { type:'pad',   name:'弦楽器パッド',   icon:'🎻', freqs:[220,277.18,329.63,440], vol:0.48 },
+        { type:'pad',   name:'弦楽器パッド',   icon:'🎻', freqs:[220,275,330,440], vol:0.48 },
         { type:'stream', name:'川の流れ', icon:'💧', vol:0.18 },
       ]},
     ]
@@ -910,12 +1061,12 @@ PRESETS.morning = [
         { type:'noise',    name:'ピンクノイズ',      icon:'🌫️', noiseType:'pink', vol:0.36 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, 329.63, null, 440, null],
-            [277.18, null, 329.63, null, 554.37],
-            [220, null, 277.18, 329.63, null],
-            [329.63, 440, null, 329.63, null],
+            [220, 330, null, 440, null],
+            [275, null, 330, null, 550],
+            [220, null, 275, 330, null],
+            [330, 440, null, 330, null],
           ], bpm:22, startDelay:3, vol:0.48 },
-        { type:'pad',    name:'弦楽器パッド', icon:'🎻', freqs:[220,277.18,329.63,440], vol:0.52 },
+        { type:'pad',    name:'弦楽器パッド', icon:'🎻', freqs:[220,275,330,440], vol:0.52 },
         { type:'stream', name:'川の流れ',     icon:'💧', vol:0.20 },
       ]},
       { name:'ディープ', layers: [
@@ -923,12 +1074,12 @@ PRESETS.morning = [
         { type:'noise',    name:'ピンクノイズ',      icon:'🌫️', noiseType:'pink', vol:0.36 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, 329.63, null, 440, null],
-            [277.18, null, 329.63, null, 554.37],
-            [220, null, 277.18, 329.63, null],
-            [329.63, 440, null, 329.63, null],
+            [220, 330, null, 440, null],
+            [275, null, 330, null, 550],
+            [220, null, 275, 330, null],
+            [330, 440, null, 330, null],
           ], bpm:22, startDelay:3, vol:0.48 },
-        { type:'pad',    name:'弦楽器パッド', icon:'🎻', freqs:[220,277.18,329.63,440], vol:0.52 },
+        { type:'pad',    name:'弦楽器パッド', icon:'🎻', freqs:[220,275,330,440], vol:0.52 },
         { type:'stream', name:'川の流れ',     icon:'💧', vol:0.20 },
         { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.22 },
       ]},
@@ -948,30 +1099,30 @@ PRESETS.morning = [
       { name:'ライト', layers: [
         { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.48 },
         { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.36 },
-        { type:'pad',   name:'弦楽器パッド',   icon:'🎻', freqs:[220,277.18,329.63,440,554.37], vol:0.58 },
+        { type:'pad',   name:'弦楽器パッド',   icon:'🎻', freqs:[220,275,330,440,550], vol:0.58 },
       ]},
       { name:'スタンダード', layers: [
         { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.48 },
-        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,277.18,329.63,440,554.37], vol:0.58 },
+        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,275,330,440,550], vol:0.58 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, 277.18, 329.63, null, 440],
-            [329.63, 440, null, 554.37, 440],
-            [220, null, 329.63, 440, null],
-            [277.18, 329.63, null, 440, null],
+            [220, 275, 330, null, 440],
+            [330, 440, null, 550, 440],
+            [220, null, 330, 440, null],
+            [275, 330, null, 440, null],
           ], bpm:18, startDelay:5, vol:0.50 },
         { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.36 },
         { type:'wind',  name:'風の音',         icon:'🍃', vol:0.18 },
       ]},
       { name:'ディープ', layers: [
         { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:200, beat:8, driftTo:14, driftDuration:1200, vol:0.48 },
-        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,277.18,329.63,440,554.37], vol:0.58 },
+        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,275,330,440,550], vol:0.58 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, 277.18, 329.63, null, 440],
-            [329.63, 440, null, 554.37, 440],
-            [220, null, 329.63, 440, null],
-            [277.18, 329.63, null, 440, null],
+            [220, 275, 330, null, 440],
+            [330, 440, null, 550, 440],
+            [220, null, 330, 440, null],
+            [275, 330, null, 440, null],
           ], bpm:18, startDelay:5, vol:0.50 },
         { type:'birds', name:'小鳥のさえずり', icon:'🐦', vol:0.36 },
         { type:'wind',  name:'風の音',         icon:'🍃', vol:0.18 },
@@ -996,26 +1147,26 @@ PRESETS.morning = [
       ]},
       { name:'スタンダード', layers: [
         { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:210, beat:10, driftTo:16, driftDuration:900, vol:0.52 },
-        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,329.63,440,554.37], vol:0.58 },
+        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,330,440,550], vol:0.58 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, 329.63, 440, null, 554.37],
-            [329.63, 440, 554.37, null, 659.25],
-            [220, 277.18, 329.63, 440, null],
-            [440, 554.37, null, 659.25, null],
+            [220, 330, 440, null, 550],
+            [330, 440, 550, null, 660],
+            [220, 275, 330, 440, null],
+            [440, 550, null, 660, null],
           ], bpm:26, startDelay:3, vol:0.54 },
         { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.38 },
         { type:'stream', name:'川の流れ',       icon:'💧', vol:0.22 },
       ]},
       { name:'ディープ', layers: [
         { type:'binaural', name:'バイノーラル α→β', icon:'〜', base:210, beat:10, driftTo:16, driftDuration:900, vol:0.52 },
-        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,329.63,440,554.37], vol:0.58 },
+        { type:'pad',      name:'弦楽器パッド',      icon:'🎻', freqs:[220,330,440,550], vol:0.58 },
         { type:'harp',     name:'ハープ',            icon:'🪕',
           patterns:[
-            [220, 329.63, 440, null, 554.37],
-            [329.63, 440, 554.37, null, 659.25],
-            [220, 277.18, 329.63, 440, null],
-            [440, 554.37, null, 659.25, null],
+            [220, 330, 440, null, 550],
+            [330, 440, 550, null, 660],
+            [220, 275, 330, 440, null],
+            [440, 550, null, 660, null],
           ], bpm:26, startDelay:3, vol:0.54 },
         { type:'birds',  name:'小鳥のさえずり', icon:'🐦', vol:0.38 },
         { type:'stream', name:'川の流れ',       icon:'💧', vol:0.22 },
@@ -1045,27 +1196,41 @@ PRESETS.relax = [
       { name:'スタンダード', layers: [
         { type:'binaural',  name:'バイノーラル α波 8Hz',  icon:'〜', base:180, beat:8, vol:0.46 },
         { type:'ocean',     name:'波の音',                icon:'🌊', vol:0.56 },
-        { type:'pad',       name:'弦楽器パッド',           icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.52 },
+        { type:'pad',       name:'弦楽器パッド',           icon:'🎻', freqs:[264,330,396,528], vol:0.52 },
         { type:'harp',      name:'ハープ',                 icon:'🪕',
           patterns:[
-            [261.63, null, 392, null, null],
-            [null, 329.63, null, 261.63, null],
-            [392, null, null, 329.63, null],
-            [null, 261.63, null, null, 523.25],
+            [264, null, 396, null, null],
+            [null, 330, null, 264, null],
+            [396, null, null, 330, null],
+            [null, 264, null, null, 528],
           ], bpm:16, startDelay:6, vol:0.40 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [132,  null, null, null, 264,  null, null, null],
+            [null, null, 198,  null, null, null, 264,  null],
+            [264,  null, null, 198,  null, null, null, 132 ],
+            [null, 165,  null, null, null, 198,  null, null],
+          ], bpm:10, startDelay:8, vol:0.34 },
         { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:26000, vol:0.50 },
       ]},
       { name:'ディープ', layers: [
         { type:'binaural',  name:'バイノーラル α波 8Hz',  icon:'〜', base:180, beat:8, vol:0.46 },
         { type:'ocean',     name:'波の音',                icon:'🌊', vol:0.56 },
-        { type:'pad',       name:'弦楽器パッド',           icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.52 },
+        { type:'pad',       name:'弦楽器パッド',           icon:'🎻', freqs:[264,330,396,528], vol:0.52 },
         { type:'harp',      name:'ハープ',                 icon:'🪕',
           patterns:[
-            [261.63, null, 392, null, null],
-            [null, 329.63, null, 261.63, null],
-            [392, null, null, 329.63, null],
-            [null, 261.63, null, null, 523.25],
+            [264, null, 396, null, null],
+            [null, 330, null, 264, null],
+            [396, null, null, 330, null],
+            [null, 264, null, null, 528],
           ], bpm:16, startDelay:6, vol:0.40 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [132,  null, null, null, 264,  null, null, null],
+            [null, null, 198,  null, null, null, 264,  null],
+            [264,  null, null, 198,  null, null, null, 132 ],
+            [null, 165,  null, null, null, 198,  null, null],
+          ], bpm:10, startDelay:8, vol:0.34 },
         { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:26000, vol:0.50 },
         { type:'rain', name:'雨音', icon:'🌧️', vol:0.22 },
       ]},
@@ -1091,27 +1256,34 @@ PRESETS.relax = [
         { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.50 },
         { type:'rain',     name:'雨音',                 icon:'🌧️', vol:0.58 },
         { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.34 },
-        { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[261.63,329.63,392], vol:0.48 },
+        { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[264,330,396], vol:0.48 },
         { type:'harp',     name:'ハープ',                 icon:'🪕',
           patterns:[
-            [261.63, null, null, 329.63, null],
-            [null, 392, null, 261.63, null],
-            [329.63, null, 261.63, null, null],
-            [null, null, 392, null, 261.63],
+            [264, null, null, 330, null],
+            [null, 396, null, 264, null],
+            [330, null, 264, null, null],
+            [null, null, 396, null, 264],
           ], bpm:14, startDelay:8, vol:0.34 },
       ]},
       { name:'ディープ', layers: [
         { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.50 },
         { type:'rain',     name:'雨音',                 icon:'🌧️', vol:0.58 },
         { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.34 },
-        { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[261.63,329.63,392], vol:0.48 },
+        { type:'pad',      name:'弦楽器パッド',           icon:'🎻', freqs:[264,330,396], vol:0.48 },
         { type:'harp',     name:'ハープ',                 icon:'🪕',
           patterns:[
-            [261.63, null, null, 329.63, null],
-            [null, 392, null, 261.63, null],
-            [329.63, null, 261.63, null, null],
-            [null, null, 392, null, 261.63],
+            [264, null, null, 330, null],
+            [null, 396, null, 264, null],
+            [330, null, 264, null, null],
+            [null, null, 396, null, 264],
           ], bpm:14, startDelay:8, vol:0.34 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [132,  null, null, null, 264,  null, null, null],
+            [null, null, 198,  null, null, null, 264,  null],
+            [264,  null, null, 198,  null, null, null, 132 ],
+            [null, 165,  null, null, null, 198,  null, null],
+          ], bpm:10, startDelay:8, vol:0.34 },
         { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:24000, vol:0.44 },
       ]},
     ]
@@ -1136,10 +1308,10 @@ PRESETS.relax = [
         { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.38 },
         { type:'harp',     name:'ハープ',                 icon:'🪕',
           patterns:[
-            [261.63, null, 329.63, null, null],
-            [null, 392, null, null, 261.63],
-            [329.63, null, null, 261.63, null],
-            [null, 261.63, null, 392, null],
+            [264, null, 330, null, null],
+            [null, 396, null, null, 264],
+            [330, null, null, 264, null],
+            [null, 264, null, 396, null],
           ], bpm:13, startDelay:7, vol:0.36 },
       ]},
       { name:'ディープ', layers: [
@@ -1148,10 +1320,10 @@ PRESETS.relax = [
         { type:'noise',    name:'ブラウンノイズ',         icon:'🌫️', noiseType:'brown', vol:0.38 },
         { type:'harp',     name:'ハープ',                 icon:'🪕',
           patterns:[
-            [261.63, null, 329.63, null, null],
-            [null, 392, null, null, 261.63],
-            [329.63, null, null, 261.63, null],
-            [null, 261.63, null, 392, null],
+            [264, null, 330, null, null],
+            [null, 396, null, null, 264],
+            [330, null, null, 264, null],
+            [null, 264, null, 396, null],
           ], bpm:13, startDelay:7, vol:0.36 },
         { type:'ocean', name:'波の音', icon:'🌊', vol:0.30 },
         { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:26000, vol:0.36 },
@@ -1178,27 +1350,34 @@ PRESETS.relax = [
         { type:'binaural',  name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.44 },
         { type:'ocean',     name:'波の音',               icon:'🌊', vol:0.58 },
         { type:'solfeggio', name:'528Hz ソルフェジオ',   icon:'✦',  vol:0.52 },
-        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.56 },
+        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396,528], vol:0.56 },
         { type:'harp',      name:'ハープ',                icon:'🪕',
           patterns:[
-            [261.63, 329.63, null, 392, null],
-            [329.63, null, 392, null, 261.63],
-            [null, 261.63, null, 329.63, 523.25],
-            [392, null, 329.63, 261.63, null],
+            [264, 330, null, 396, null],
+            [330, null, 396, null, 264],
+            [null, 264, null, 330, 528],
+            [396, null, 330, 264, null],
           ], bpm:17, startDelay:7, vol:0.40 },
       ]},
       { name:'ディープ', layers: [
         { type:'binaural',  name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.44 },
         { type:'ocean',     name:'波の音',               icon:'🌊', vol:0.58 },
         { type:'solfeggio', name:'528Hz ソルフェジオ',   icon:'✦',  vol:0.52 },
-        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[261.63,329.63,392,523.25], vol:0.56 },
+        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[264,330,396,528], vol:0.56 },
         { type:'harp',      name:'ハープ',                icon:'🪕',
           patterns:[
-            [261.63, 329.63, null, 392, null],
-            [329.63, null, 392, null, 261.63],
-            [null, 261.63, null, 329.63, 523.25],
-            [392, null, 329.63, 261.63, null],
+            [264, 330, null, 396, null],
+            [330, null, 396, null, 264],
+            [null, 264, null, 330, 528],
+            [396, null, 330, 264, null],
           ], bpm:17, startDelay:7, vol:0.40 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [132,  null, null, null, 264,  null, null, null],
+            [null, null, 198,  null, null, null, 264,  null],
+            [264,  null, null, 198,  null, null, null, 132 ],
+            [null, 165,  null, null, null, 198,  null, null],
+          ], bpm:10, startDelay:8, vol:0.34 },
         { type:'bowl', name:'チベタンボウル', icon:'🔔', interval:26000, vol:0.44 },
       ]},
     ]
@@ -1221,28 +1400,35 @@ PRESETS.relax = [
       { name:'スタンダード', layers: [
         { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.48 },
         { type:'stream',   name:'川の流れ',               icon:'💧', vol:0.46 },
-        { type:'pad',      name:'弦楽器パッド',            icon:'🎻', freqs:[261.63,329.63,392], vol:0.52 },
+        { type:'pad',      name:'弦楽器パッド',            icon:'🎻', freqs:[264,330,396], vol:0.52 },
         { type:'bowl',     name:'チベタンボウル',           icon:'🔔', interval:20000, vol:0.48 },
         { type:'harp',     name:'ハープ',                  icon:'🪕',
           patterns:[
-            [261.63, null, 392, null, 329.63],
-            [null, 329.63, null, 261.63, null],
-            [392, null, 261.63, null, null],
-            [null, 261.63, 329.63, null, 392],
+            [264, null, 396, null, 330],
+            [null, 330, null, 264, null],
+            [396, null, 264, null, null],
+            [null, 264, 330, null, 396],
           ], bpm:20, startDelay:6, vol:0.38 },
       ]},
       { name:'ディープ', layers: [
         { type:'binaural', name:'バイノーラル α波 10Hz', icon:'〜', base:200, beat:10, vol:0.48 },
         { type:'stream',   name:'川の流れ',               icon:'💧', vol:0.46 },
-        { type:'pad',      name:'弦楽器パッド',            icon:'🎻', freqs:[261.63,329.63,392], vol:0.52 },
+        { type:'pad',      name:'弦楽器パッド',            icon:'🎻', freqs:[264,330,396], vol:0.52 },
         { type:'bowl',     name:'チベタンボウル',           icon:'🔔', interval:20000, vol:0.48 },
         { type:'harp',     name:'ハープ',                  icon:'🪕',
           patterns:[
-            [261.63, null, 392, null, 329.63],
-            [null, 329.63, null, 261.63, null],
-            [392, null, 261.63, null, null],
-            [null, 261.63, 329.63, null, 392],
+            [264, null, 396, null, 330],
+            [null, 330, null, 264, null],
+            [396, null, 264, null, null],
+            [null, 264, 330, null, 396],
           ], bpm:20, startDelay:6, vol:0.38 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [132,  null, null, null, 264,  null, null, null],
+            [null, null, 198,  null, null, null, 264,  null],
+            [264,  null, null, 198,  null, null, null, 132 ],
+            [null, 165,  null, null, null, 198,  null, null],
+          ], bpm:10, startDelay:8, vol:0.34 },
         { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦', vol:0.40 },
       ]},
     ]
@@ -1268,26 +1454,26 @@ PRESETS.presleep = [
       { name: 'スタンダード', layers: [
         { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.50 },
         { type:'stream',   name:'川の流れ',             icon:'💧', vol:0.54 },
-        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.50 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[176,220,264,352], vol:0.50 },
         { type:'harp',     name:'ハープ',               icon:'🪕',
           patterns:[
-            [174.61, null, 261.63, null, null],
-            [null, 220, null, 174.61, null],
-            [261.63, null, null, 220, null],
-            [null, 174.61, null, null, 349.23],
+            [176, null, 264, null, null],
+            [null, 220, null, 176, null],
+            [264, null, null, 220, null],
+            [null, 176, null, null, 352],
           ], bpm:14, startDelay:6, vol:0.40 },
       ]},
       { name: 'ディープ', layers: [
         { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.50 },
         { type:'stream',   name:'川の流れ',             icon:'💧', vol:0.50 },
         { type:'rain',     name:'雨音',                 icon:'🌧️', vol:0.26 },
-        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.52 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[176,220,264,352], vol:0.52 },
         { type:'harp',     name:'ハープ',               icon:'🪕',
           patterns:[
-            [174.61, null, 261.63, null, null],
-            [null, 220, null, 174.61, null],
-            [261.63, null, null, 220, null],
-            [null, 174.61, null, null, 349.23],
+            [176, null, 264, null, null],
+            [null, 220, null, 176, null],
+            [264, null, null, 220, null],
+            [null, 176, null, null, 352],
           ], bpm:14, startDelay:6, vol:0.40 },
         { type:'bowl',     name:'チベタンボウル',         icon:'🔔', interval:28000, vol:0.42 },
       ]},
@@ -1305,30 +1491,44 @@ PRESETS.presleep = [
     presets: [
       { name: 'ライト', layers: [
         { type:'binaural', name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.48 },
-        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.56 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[176,220,264,352], vol:0.56 },
       ]},
       { name: 'スタンダード', layers: [
         { type:'binaural', name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.48 },
-        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.56 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[176,220,264,352], vol:0.56 },
         { type:'harp',     name:'ハープ',               icon:'🪕',
           patterns:[
-            [174.61, null, null, 261.63, null],
-            [null, 220, null, null, 174.61],
-            [261.63, null, 220, null, null],
-            [null, null, 174.61, 220, null],
+            [176, null, null, 264, null],
+            [null, 220, null, null, 176],
+            [264, null, 220, null, null],
+            [null, null, 176, 220, null],
           ], bpm:13, startDelay:7, vol:0.38 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [176,  null, null, null, 264,  null, null, null],
+            [null, null, 220,  null, null, null, 264,  null],
+            [264,  null, null, 220,  null, null, null, 176 ],
+            [null, 176,  null, null, null, 220,  null, null],
+          ], bpm:9, startDelay:7, vol:0.34 },
         { type:'bowl',     name:'チベタンボウル',         icon:'🔔', interval:26000, vol:0.48 },
       ]},
       { name: 'ディープ', layers: [
         { type:'binaural',  name:'バイノーラル α波 8Hz', icon:'〜', base:180, beat:8, vol:0.48 },
-        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.56 },
+        { type:'pad',       name:'弦楽器パッド',          icon:'🎻', freqs:[176,220,264,352], vol:0.56 },
         { type:'harp',      name:'ハープ',               icon:'🪕',
           patterns:[
-            [174.61, null, null, 261.63, null],
-            [null, 220, null, null, 174.61],
-            [261.63, null, 220, null, null],
-            [null, null, 174.61, 220, null],
+            [176, null, null, 264, null],
+            [null, 220, null, null, 176],
+            [264, null, 220, null, null],
+            [null, null, 176, 220, null],
           ], bpm:13, startDelay:7, vol:0.38 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [176,  null, null, null, 264,  null, null, null],
+            [null, null, 220,  null, null, null, 264,  null],
+            [264,  null, null, 220,  null, null, null, 176 ],
+            [null, 176,  null, null, null, 220,  null, null],
+          ], bpm:9, startDelay:7, vol:0.34 },
         { type:'bowl',      name:'チベタンボウル',         icon:'🔔', interval:26000, vol:0.48 },
         { type:'solfeggio', name:'528Hz ソルフェジオ',    icon:'✦',  vol:0.44 },
       ]},
@@ -1351,25 +1551,25 @@ PRESETS.presleep = [
       { name: 'スタンダード', layers: [
         { type:'binaural', name:'バイノーラル α→θ',    icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2700, vol:0.52 },
         { type:'noise',    name:'ブラウンノイズ',       icon:'🌫️', noiseType:'brown', vol:0.34 },
-        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.50 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[176,220,264,352], vol:0.50 },
         { type:'harp',     name:'ハープ',               icon:'🪕',
           patterns:[
-            [174.61, null, 261.63, null, null],
-            [null, null, 220, null, 174.61],
-            [261.63, null, null, null, 220],
-            [null, 174.61, null, 261.63, null],
+            [176, null, 264, null, null],
+            [null, null, 220, null, 176],
+            [264, null, null, null, 220],
+            [null, 176, null, 264, null],
           ], bpm:12, startDelay:8, vol:0.34 },
       ]},
       { name: 'ディープ', layers: [
         { type:'binaural',  name:'バイノーラル α→θ',   icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2700, vol:0.52 },
         { type:'noise',     name:'ブラウンノイズ',      icon:'🌫️', noiseType:'brown', vol:0.34 },
-        { type:'pad',       name:'弦楽器パッド',         icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.50 },
+        { type:'pad',       name:'弦楽器パッド',         icon:'🎻', freqs:[176,220,264,352], vol:0.50 },
         { type:'harp',      name:'ハープ',              icon:'🪕',
           patterns:[
-            [174.61, null, 261.63, null, null],
-            [null, null, 220, null, 174.61],
-            [261.63, null, null, null, 220],
-            [null, 174.61, null, 261.63, null],
+            [176, null, 264, null, null],
+            [null, null, 220, null, 176],
+            [264, null, null, null, 220],
+            [null, 176, null, 264, null],
           ], bpm:12, startDelay:8, vol:0.34 },
         { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:24000, vol:0.44 },
         { type:'solfeggio', name:'528Hz ソルフェジオ',  icon:'✦',  vol:0.40 },
@@ -1393,26 +1593,40 @@ PRESETS.presleep = [
       { name: 'スタンダード', layers: [
         { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.46 },
         { type:'fire',     name:'焚き火',               icon:'🔥', vol:0.55 },
-        { type:'organ',    name:'オルガン',              icon:'🎹', baseFreq:87.31, vol:0.44 },
+        { type:'organ',    name:'オルガン',              icon:'🎹', baseFreq:88.0, vol:0.44 },
         { type:'harp',     name:'ハープ',               icon:'🪕',
           patterns:[
-            [174.61, null, 220, null, null],
-            [null, 261.63, null, 174.61, null],
-            [220, null, null, 261.63, null],
-            [null, 174.61, null, null, 220],
+            [176, null, 220, null, null],
+            [null, 264, null, 176, null],
+            [220, null, null, 264, null],
+            [null, 176, null, null, 220],
           ], bpm:15, startDelay:6, vol:0.36 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [176,  null, null, null, 264,  null, null, null],
+            [null, null, 220,  null, null, null, 264,  null],
+            [264,  null, null, 220,  null, null, null, 176 ],
+            [null, 176,  null, null, null, 220,  null, null],
+          ], bpm:9, startDelay:7, vol:0.34 },
       ]},
       { name: 'ディープ', layers: [
         { type:'binaural', name:'バイノーラル α波 9Hz', icon:'〜', base:180, beat:9, vol:0.46 },
         { type:'fire',     name:'焚き火',               icon:'🔥', vol:0.52 },
-        { type:'organ',    name:'オルガン',              icon:'🎹', baseFreq:87.31, vol:0.44 },
+        { type:'organ',    name:'オルガン',              icon:'🎹', baseFreq:88.0, vol:0.44 },
         { type:'harp',     name:'ハープ',               icon:'🪕',
           patterns:[
-            [174.61, null, 220, null, null],
-            [null, 261.63, null, 174.61, null],
-            [220, null, null, 261.63, null],
-            [null, 174.61, null, null, 220],
+            [176, null, 220, null, null],
+            [null, 264, null, 176, null],
+            [220, null, null, 264, null],
+            [null, 176, null, null, 220],
           ], bpm:15, startDelay:6, vol:0.36 },
+        { type:'piano', name:'ソフトピアノ', icon:'🎹',
+          patterns:[
+            [176,  null, null, null, 264,  null, null, null],
+            [null, null, 220,  null, null, null, 264,  null],
+            [264,  null, null, 220,  null, null, null, 176 ],
+            [null, 176,  null, null, null, 220,  null, null],
+          ], bpm:9, startDelay:7, vol:0.34 },
         { type:'bowl',     name:'チベタンボウル',        icon:'🔔', interval:26000, vol:0.40 },
       ]},
     ]
@@ -1434,20 +1648,20 @@ PRESETS.presleep = [
       { name: 'スタンダード', layers: [
         { type:'binaural', name:'バイノーラル α→θ',    icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2400, vol:0.50 },
         { type:'stream',   name:'川の流れ',             icon:'💧', vol:0.48 },
-        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.52 },
+        { type:'pad',      name:'弦楽器パッド',          icon:'🎻', freqs:[176,220,264,352], vol:0.52 },
         { type:'bowl',     name:'チベタンボウル',        icon:'🔔', interval:22000, vol:0.50 },
       ]},
       { name: 'ディープ', layers: [
         { type:'binaural',  name:'バイノーラル α→θ',   icon:'〜', base:200, beat:9, driftTo:5, driftDuration:2400, vol:0.50 },
         { type:'stream',    name:'川の流れ',            icon:'💧', vol:0.46 },
-        { type:'pad',       name:'弦楽器パッド',         icon:'🎻', freqs:[174.61,220,261.63,349.23], vol:0.52 },
+        { type:'pad',       name:'弦楽器パッド',         icon:'🎻', freqs:[176,220,264,352], vol:0.52 },
         { type:'bowl',      name:'チベタンボウル',       icon:'🔔', interval:22000, vol:0.50 },
         { type:'harp',      name:'ハープ',              icon:'🪕',
           patterns:[
-            [174.61, null, 261.63, null, null],
-            [null, 220, null, 174.61, null],
-            [261.63, null, null, 220, null],
-            [null, 174.61, 220, null, null],
+            [176, null, 264, null, null],
+            [null, 220, null, 176, null],
+            [264, null, null, 220, null],
+            [null, 176, 220, null, null],
           ], bpm:13, startDelay:7, vol:0.36 },
         { type:'solfeggio', name:'528Hz ソルフェジオ',  icon:'✦',  vol:0.42 },
       ]},
@@ -2109,35 +2323,75 @@ class HealingApp {
   }
 
   _makeStringPad(freqs) {
-    const ac       = this.ac;
+    const ac = this.ac;
     const gainNode = ac.createGain();
     gainNode.gain.value = 0;
     gainNode.connect(this.dryBus);
     gainNode.connect(this.reverbSend);
-
     const nodes = [];
-    freqs.forEach(freq => {
-      [-4, 4].forEach(det => {
+
+    // ── Summing bus → dual LP → output ──
+    const sumG = ac.createGain();
+    sumG.gain.value = 1;
+    const lp1 = ac.createBiquadFilter();
+    lp1.type = 'lowpass'; lp1.frequency.value = 2800; lp1.Q.value = 0.4;
+    const lp2 = ac.createBiquadFilter();
+    lp2.type = 'lowpass'; lp2.frequency.value = 1600; lp2.Q.value = 0.3;
+    sumG.connect(lp1); lp1.connect(lp2); lp2.connect(gainNode);
+
+    // ── Master tremolo (bowing variation, very subtle) ──
+    const tremLFO = ac.createOscillator();
+    tremLFO.frequency.value = 4.8 + Math.random() * 0.5;
+    tremLFO.type = 'sine';
+    const tremDpth = ac.createGain();
+    tremDpth.gain.value = 0.018;
+    tremLFO.connect(tremDpth);
+    tremDpth.connect(sumG.gain);
+    tremLFO.start();
+    nodes.push(tremLFO);
+
+    freqs.forEach((freq, fi) => {
+      // Per-note vibrato LFO (slightly different rate for each string)
+      const vibLFO = ac.createOscillator();
+      vibLFO.type = 'sine';
+      vibLFO.frequency.value = 5.1 + fi * 0.18 + Math.random() * 0.4;
+      vibLFO.start();
+      nodes.push(vibLFO);
+
+      // Two detuned voices: -5 cents and +5 cents (section-strings spread)
+      [-5, 5].forEach((detCents) => {
+        const detRatio = Math.pow(2, detCents / 1200);
+        const voiceG = ac.createGain();
+        voiceG.gain.value = 0.50;
+        voiceG.connect(sumG);
+
+        // Vibrato depth per voice
+        const vibDepth = ac.createGain();
+        vibDepth.gain.value = freq * detRatio * 0.0055;  // ~9 cents depth
+        vibLFO.connect(vibDepth);
+
+        // Sawtooth oscillator (rich harmonic series → string-like)
         const osc = ac.createOscillator();
-        osc.type  = 'sine';
-        osc.frequency.value = freq;
-        osc.detune.value    = det;
+        osc.type = 'sawtooth';
+        osc.frequency.value = freq * detRatio;
+        vibDepth.connect(osc.frequency);
 
-        const lfo  = ac.createOscillator();
-        const lfoG = ac.createGain();
-        lfo.frequency.value = 4.6 + Math.random() * 0.8;
-        lfoG.gain.value     = 4;
-        lfo.connect(lfoG);
-        lfoG.connect(osc.detune);
+        // Per-voice rolloff (soften individual notes before summing)
+        const noteLp = ac.createBiquadFilter();
+        noteLp.type = 'lowpass';
+        noteLp.frequency.value = Math.min(freq * 7, 3500);
+        noteLp.Q.value = 0.35;
 
+        // Envelope: 0 → full over 1.5 s (bowing attack)
         const env = ac.createGain();
         env.gain.setValueAtTime(0, ac.currentTime);
-        env.gain.linearRampToValueAtTime(0.14, ac.currentTime + 5);
+        env.gain.linearRampToValueAtTime(0.14, ac.currentTime + 1.5);
 
-        osc.connect(env);
-        env.connect(gainNode);
-        osc.start(); lfo.start();
-        nodes.push(osc, lfo);
+        osc.connect(noteLp);
+        noteLp.connect(env);
+        env.connect(voiceG);
+        osc.start();
+        nodes.push(osc);
       });
     });
 
@@ -2238,19 +2492,50 @@ class HealingApp {
 
       const freq = curPat[noteIdx];
       if (freq) {
-        const velocity = 0.52 + Math.random() * 0.42;
+        // Wider velocity range for more expression
+        const velocity = 0.32 + Math.random() * 0.62;
+
+        // 18% chance of ornament: a quick grace note 50–80 ms before the main note
+        if (Math.random() < 0.18) {
+          const graceFreq = freq * (Math.random() < 0.5 ? 9/8 : 8/9); // step up or down
+          const graceBuf = computeAdditiveBuffer(this.ac, graceFreq, 1.2);
+          const graceS = this.ac.createBufferSource();
+          graceS.buffer = graceBuf;
+          const graceG = this.ac.createGain();
+          graceG.gain.value = velocity * 0.38;
+          graceS.connect(graceG);
+          graceG.connect(destGain);
+          const graceDelay = 0.055 + Math.random() * 0.025;
+          graceS.start(this.ac.currentTime + graceDelay);
+          graceS.stop(this.ac.currentTime + graceDelay + 1.4);
+        }
+
+        // 12% chance of double-touch: play a harmony note 35–55 ms later
+        if (Math.random() < 0.12) {
+          const harmFreq = freq * (Math.random() < 0.6 ? 3/2 : 4/3); // 5th or 4th
+          if (harmFreq < this.ac.sampleRate * 0.45) {
+            const harmBuf = computeAdditiveBuffer(this.ac, harmFreq, 3.5);
+            const harmS = this.ac.createBufferSource();
+            harmS.buffer = harmBuf;
+            const harmG = this.ac.createGain();
+            harmG.gain.value = velocity * 0.28;
+            harmS.connect(harmG);
+            harmG.connect(destGain);
+            const harmDelay = 0.035 + Math.random() * 0.020;
+            harmS.start(this.ac.currentTime + harmDelay);
+            harmS.stop(this.ac.currentTime + harmDelay + 3.8);
+          }
+        }
+
         const buf = computeAdditiveBuffer(this.ac, freq, 4.5);
         const src = this.ac.createBufferSource();
         src.buffer = buf;
-        const g   = this.ac.createGain();
-        const now = this.ac.currentTime;
-        g.gain.setValueAtTime(0, now);
-        g.gain.linearRampToValueAtTime(velocity, now + 0.006); // 6 ms attack ramp
-        src.connect(g);
-        g.connect(destGain);
-        g.connect(this.reverbSend);
+        const noteG = this.ac.createGain();
+        noteG.gain.value = velocity;
+        src.connect(noteG);
+        noteG.connect(destGain);
         src.start();
-        src.onended = () => { try { g.disconnect(); } catch (_) {} };
+        src.stop(this.ac.currentTime + 4.8);
       }
 
       noteIdx++;
@@ -2269,8 +2554,71 @@ class HealingApp {
         }
       }
 
+      // ±4% timing humanization
+      const humanizedMs = beatMs * (0.96 + Math.random() * 0.08);
       const jitter = beatMs * 0.035 * (Math.random() - 0.5);
-      this.schedulerTmrs.push(setTimeout(tick, beatMs + jitter));
+      this.schedulerTmrs.push(setTimeout(tick, humanizedMs + jitter));
+    };
+
+    this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
+  }
+
+  _schedulePianoNotes(patterns, bpm, destGain, startDelaySec = 4) {
+    const beatMs = (60 / bpm) * 1000;
+    const maxLen = Math.max(...patterns.map(p => p.length));
+    const REST   = Array(maxLen).fill(null);
+
+    let patIdx = 0, noteIdx = 0, curPat = patterns[0];
+
+    const tick = () => {
+      if (!this.isPlaying) return;
+
+      const freq = curPat[noteIdx];
+      if (freq) {
+        const velocity = 0.28 + Math.random() * 0.48;  // gentle dynamics
+        const dur      = 4.8 + Math.random() * 1.2;
+
+        const buf = computePianoBuffer(this.ac, freq, velocity, dur);
+        const src = this.ac.createBufferSource();
+        src.buffer = buf;
+        const noteG = this.ac.createGain();
+        noteG.gain.value = velocity;
+        src.connect(noteG);
+        noteG.connect(destGain);
+        src.start();
+        src.stop(this.ac.currentTime + dur + 0.5);
+
+        // Occasional soft inner pedal note (bass support), 20% chance
+        if (Math.random() < 0.20 && freq > 200) {
+          const bassFreq = freq / 2;
+          const bassBuf  = computePianoBuffer(this.ac, bassFreq, velocity * 0.45, dur * 1.2);
+          const bassS    = this.ac.createBufferSource();
+          bassS.buffer   = bassBuf;
+          const bassG    = this.ac.createGain();
+          bassG.gain.value = velocity * 0.45;
+          bassS.connect(bassG);
+          bassG.connect(destGain);
+          bassS.start();
+          bassS.stop(this.ac.currentTime + dur * 1.2 + 0.5);
+        }
+      }
+
+      noteIdx++;
+      if (noteIdx >= curPat.length) {
+        noteIdx = 0;
+        patIdx++;
+        if (patIdx >= patterns.length) patIdx = 0;
+        // 12% breath rest between patterns
+        if (Math.random() < 0.12) {
+          curPat = REST;
+        } else {
+          curPat = patterns[patIdx];
+        }
+      }
+
+      const humanMs = beatMs * (0.94 + Math.random() * 0.12);
+      const jitter  = (Math.random() - 0.5) * beatMs * 0.04;
+      this.schedulerTmrs.push(setTimeout(tick, humanMs + jitter));
     };
 
     this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
@@ -2421,6 +2769,15 @@ class HealingApp {
         case 'cricket': {
           const cr = this._makeCrickets();
           this.layers.push({ name: def.name, icon: def.icon, gainNode: cr.gainNode, nodes: cr.nodes, defaultVol: def.vol });
+          break;
+        }
+        case 'piano': {
+          const g = this.ac.createGain();
+          g.gain.value = 0;
+          g.connect(this.dryBus);
+          g.connect(this.reverbSend);
+          this.layers.push({ name: def.name, icon: def.icon, gainNode: g, nodes: [], defaultVol: def.vol });
+          this._schedulePianoNotes(def.patterns, def.bpm, g, def.startDelay || 5);
           break;
         }
       }
