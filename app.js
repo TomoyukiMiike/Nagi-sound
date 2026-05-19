@@ -124,6 +124,19 @@ function computePianoBuffer(ac, freq, velocity = 0.7, durationSec = 5.5) {
   const phi = Math.random() * Math.PI * 2;
   const fadeIn = Math.round(sr * 0.002);  // 2 ms crisp attack
 
+  // ── Pre-compute values for overtone enrichment ──────────────────────────
+  // Real piano hammers strike 2–3 slightly detuned unison strings per note.
+  // The slow beating between them (~1–3 Hz) is the core of piano's warm shimmer.
+  const fDet1 = freq * 1.001039;   // +1.8 cents  (string 2)
+  const fDet2 = freq * 0.999423;   // −1.0 cent   (string 3, softer)
+  // Upper air harmonics: add "breath" and bell-shimmer at the moment of attack
+  const f9    = freq * 9;
+  const f11   = freq * 11;
+  const f13   = freq * 13;
+  const f9ok  = f9  < sr * 0.45;
+  const f11ok = f11 < sr * 0.45;
+  const f13ok = f13 < sr * 0.45;
+
   for (let i = 0; i < len; i++) {
     const t = i / sr;
     let s = 0;
@@ -135,6 +148,17 @@ function computePianoBuffer(ac, freq, velocity = 0.7, durationSec = 5.5) {
       const env = amp * (0.45 * Math.exp(-fastDc * t) + 0.55 * Math.exp(-slowDc * t));
       s += env * Math.sin(2 * Math.PI * f * t + phi * n * 0.04);
     });
+
+    // Detuned unison voices — string 2 (+1.8¢) and string 3 (−1.0¢)
+    // These create the slow interference beating that makes piano sound alive
+    const envFund = 0.45 * Math.exp(-0.62 * t) + 0.55 * Math.exp(-0.057 * t);
+    s += 0.18 * envFund * Math.sin(2 * Math.PI * fDet1 * t + phi * 1.83);
+    s += 0.10 * envFund * Math.sin(2 * Math.PI * fDet2 * t + phi * 2.61);
+
+    // Upper harmonics: air, shimmer, and gentle bell-tone (fast decay → only at attack)
+    if (f9ok)  s += 0.0040 * Math.exp(-22 * t) * Math.sin(2 * Math.PI * f9  * t + phi * 2.1);
+    if (f11ok) s += 0.0022 * Math.exp(-28 * t) * Math.sin(2 * Math.PI * f11 * t + phi * 3.7);
+    if (f13ok) s += 0.0012 * Math.exp(-35 * t) * Math.sin(2 * Math.PI * f13 * t + phi * 5.2);
 
     // Hammer transient: sharp noise burst at attack
     if (i < Math.round(sr * 0.018)) {
@@ -2781,18 +2805,56 @@ class HealingApp {
         src.start();
         src.stop(this.ac.currentTime + dur + 0.5);
 
-        // Occasional soft inner pedal note (bass support), 20% chance
-        if (Math.random() < 0.20 && freq > 200) {
+        // ── Harmonic chord voicing ────────────────────────────────────────
+        // All intervals are Just Intonation ratios → zero beating, maximum consonance.
+
+        // Bass octave (freq/2): 55% chance when note is above G3 (198 Hz)
+        // Grounds the melody with a warm sub-tone without getting muddy in bass.
+        if (Math.random() < 0.55 && freq > 198) {
           const bassFreq = freq / 2;
-          const bassBuf  = computePianoBuffer(this.ac, bassFreq, velocity * 0.45, dur * 1.2);
+          const bassBuf  = computePianoBuffer(this.ac, bassFreq, velocity * 0.30, dur * 1.3);
           const bassS    = this.ac.createBufferSource();
           bassS.buffer   = bassBuf;
           const bassG    = this.ac.createGain();
-          bassG.gain.value = velocity * 0.45;
+          bassG.gain.value = velocity * 0.30;
           bassS.connect(bassG);
           bassG.connect(destGain);
           bassS.start();
-          bassS.stop(this.ac.currentTime + dur * 1.2 + 0.5);
+          bassS.stop(this.ac.currentTime + dur * 1.3 + 0.5);
+        }
+
+        // Major 3rd (×5/4): 42% chance — the warmest, most emotionally resonant interval.
+        // In JI this is a pure 5:4 ratio, perfectly in tune with the overtone series.
+        if (Math.random() < 0.42) {
+          const thirdFreq = freq * 5 / 4;
+          if (thirdFreq < 660) {  // stay below E5 to avoid shrillness
+            const thirdBuf = computePianoBuffer(this.ac, thirdFreq, velocity * 0.24, dur * 0.88);
+            const thirdS   = this.ac.createBufferSource();
+            thirdS.buffer  = thirdBuf;
+            const thirdG   = this.ac.createGain();
+            thirdG.gain.value = velocity * 0.24;
+            thirdS.connect(thirdG);
+            thirdG.connect(destGain);
+            thirdS.start();
+            thirdS.stop(this.ac.currentTime + dur * 0.88 + 0.5);
+          }
+        }
+
+        // Perfect 5th (×3/2): 26% chance — open, pure, reinforces the overtone series.
+        // The 3:2 ratio is the most consonant interval after the octave.
+        if (Math.random() < 0.26) {
+          const fifthFreq = freq * 3 / 2;
+          if (fifthFreq < 660) {
+            const fifthBuf = computePianoBuffer(this.ac, fifthFreq, velocity * 0.17, dur * 0.82);
+            const fifthS   = this.ac.createBufferSource();
+            fifthS.buffer  = fifthBuf;
+            const fifthG   = this.ac.createGain();
+            fifthG.gain.value = velocity * 0.17;
+            fifthS.connect(fifthG);
+            fifthG.connect(destGain);
+            fifthS.start();
+            fifthS.stop(this.ac.currentTime + dur * 0.82 + 0.5);
+          }
         }
       }
 
