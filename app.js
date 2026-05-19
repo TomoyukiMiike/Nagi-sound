@@ -3362,48 +3362,54 @@ class HealingApp {
 
   // Generate time-of-day + weather adaptive piano patterns
   _getMelodyPianoPatterns(cat, hour, weather) {
-    // ── Time segment ──
+    // ── Time segment → BPM ──
     let seg, bpm;
     if      (hour <  5) { seg = 0; bpm = 4;  }   // predawn   — sparse, minimal
     else if (hour < 10) { seg = 1; bpm = 9;  }   // morning   — ascending, hopeful
-    else if (hour < 17) { seg = 2; bpm = 11; }   // day       — balanced, clear
+    else if (hour < 17) { seg = 2; bpm = 10; }   // day       — balanced, clear
     else if (hour < 21) { seg = 3; bpm = 7;  }   // evening   — descending, warm
     else                { seg = 4; bpm = 5;  }   // night     — sparse, intimate
 
-    // ── Weather BPM modifier ──
     if (weather === 'clear') bpm = Math.round(bpm * 1.10);
     if (weather === 'rainy') bpm = Math.max(3, Math.round(bpm * 0.85));
 
-    // ── Note pools per category (Just Intonation) ──
-    const pools = {
-      morning:    { low:[_.C3,_.E3,_.G3],             mid:[_.C4,_.D4,_.E4,_.G4],       high:[_.C5,_.D5,_.E5,_.G5] },
-      relax:      { low:[_.C3,_.F3,_.G3,_.A3],        mid:[_.C4,_.F4,_.G4,_.A4],       high:[_.C5,_.D5,_.G5]      },
-      meditation: { low:[_.C3,_.G3,_.A3],              mid:[_.C4,_.E4,_.G4,_.A4],       high:[_.C5,_.E5,_.A5]      },
-      focus:      { low:[_.C3,_.D3,_.G3],              mid:[_.C4,_.D4,_.G4,_.A4],       high:[_.C5,_.D5,_.G5]      },
-      presleep:   { low:[_.C3,_.F3,_.A3],              mid:[_.C4,_.F4,_.A4],            high:[_.C5,_.D5]           },
-      sleep:      { low:[_.C2,_.G2,_.C3],              mid:[_.C3,_.G3,_.A3],            high:[_.C4,_.E4]           },
-      walk:       { low:[_.C3,_.G3,_.A3],              mid:[_.C4,_.D4,_.E4,_.G4],       high:[_.C5,_.D5,_.E5]      },
+    // ── Pure C-major pentatonic (C D E G A) across 3 octaves ──
+    // F and B are excluded — they create minor-2nd clashes with sustained piano decay
+    const PENTA = [
+      _.C3, _.D3, _.E3, _.G3, _.A3,   // idx 0–4
+      _.C4, _.D4, _.E4, _.G4, _.A4,   // idx 5–9
+      _.C5, _.D5, _.E5, _.G5, _.A5,   // idx 10–14
+    ];
+
+    // ── Category: usable index range within PENTA ──
+    // (kept tight to 1-1.5 octaves to avoid wild jumps within a pattern)
+    const catRange = {
+      morning:    [3,  11],   // G3–E5  bright, spread
+      relax:      [0,   9],   // C3–A4  comfortable mid
+      meditation: [0,   9],   // C3–A4  calm, centred
+      focus:      [4,  12],   // A3–G5  clear, slightly high
+      presleep:   [0,   7],   // C3–E4  low, drowsy
+      sleep:      [0,   6],   // C3–C4  very low, minimal
+      walk:       [2,  11],   // E3–E5  natural spread
     };
-    const pool = pools[cat] || pools.relax;
+    let [rMin, rMax] = catRange[cat] || catRange.relax;
 
-    // ── Register weight [low, mid, high] by time segment ──
-    const regW = [
-      [0.60, 0.35, 0.05],   // predawn
-      [0.10, 0.50, 0.40],   // morning
-      [0.20, 0.50, 0.30],   // day
-      [0.30, 0.55, 0.15],   // evening
-      [0.50, 0.45, 0.05],   // night
-    ][seg].slice();
+    // Time: predawn/night pull lower; morning pulls higher
+    const segShift = [-2, 1, 0, -1, -2][seg];
+    rMin = Math.max(0,            rMin + segShift);
+    rMax = Math.min(PENTA.length - 1, rMax + segShift);
 
-    // Weather register shift
-    if (weather === 'clear') { regW[0] = Math.max(0, regW[0] - 0.10); regW[2] = Math.min(1, regW[2] + 0.10); }
-    if (weather === 'rainy') { regW[2] = Math.max(0, regW[2] - 0.10); regW[0] = Math.min(1, regW[0] + 0.10); }
+    // Weather: clear → up 1 step, rainy → down 1 step
+    const wShift = weather === 'clear' ? 1 : weather === 'rainy' ? -1 : 0;
+    rMin = Math.max(0,            rMin + wShift);
+    rMax = Math.min(PENTA.length - 1, rMax + wShift);
+    if (rMin >= rMax) rMax = Math.min(PENTA.length - 1, rMin + 3);
 
-    // ── Note density (fraction of non-null beats) ──
-    const baseDensity = [0.28, 0.55, 0.50, 0.42, 0.25][seg];
-    const density = baseDensity * (weather === 'rainy' ? 0.82 : weather === 'clear' ? 1.08 : 1.0);
+    // ── Density ──
+    const baseDensity = [0.25, 0.50, 0.45, 0.38, 0.22][seg];
+    const density = Math.min(0.65, baseDensity * (weather === 'rainy' ? 0.80 : weather === 'clear' ? 1.05 : 1.0));
 
-    // ── Seeded RNG — same seed = same melody per (cat, seg, weather) ──
+    // ── Seeded RNG ──
     const catIdx = ['morning','relax','meditation','focus','presleep','sleep','walk'].indexOf(cat);
     const wIdx   = { clear: 0, cloudy: 1, rainy: 2 }[weather] || 1;
     let seed = (catIdx * 1000 + seg * 100 + wIdx * 10 + 7) | 0;
@@ -3412,25 +3418,53 @@ class HealingApp {
       return seed / 0x7fffffff;
     };
 
-    const pickNote = () => {
-      const r = rng();
-      let reg;
-      if      (r < regW[0])           reg = pool.low;
-      else if (r < regW[0] + regW[1]) reg = pool.mid;
-      else                             reg = pool.high;
-      return reg[Math.floor(rng() * reg.length)];
-    };
-
-    // ── Build 4 patterns × 8 beats ──
+    // ── Build 4 patterns with melodic contour ──
+    // Key idea: move STEPWISE (±1 or ±2 in PENTA) — never random-jump across octaves.
+    // Piano notes sustain 4-5 s, so consecutive notes overlap → must be consonant.
     const patterns = [];
+    let pos = Math.round(rMin + rng() * (rMax - rMin));  // starting position
+
     for (let p = 0; p < 4; p++) {
+      // Choose shape for this 8-beat pattern
+      const shapeR = rng();
+      // ascend / descend / arch(up then down) / valley(down then up) / meander
+      const shape = shapeR < 0.22 ? 'ascend'
+                  : shapeR < 0.44 ? 'descend'
+                  : shapeR < 0.62 ? 'arch'
+                  : shapeR < 0.80 ? 'valley'
+                  : 'meander';
+
       const pat = [];
       for (let n = 0; n < 8; n++) {
-        pat.push(rng() < density ? pickNote() : null);
+        if (rng() >= density) { pat.push(null); continue; }
+
+        // Stepwise delta: bias determined by shape
+        let delta;
+        switch (shape) {
+          case 'ascend':  delta = rng() < 0.70 ? 1 : 0;  break;
+          case 'descend': delta = rng() < 0.70 ? -1 : 0; break;
+          case 'arch':    delta = n < 4 ? (rng() < 0.65 ? 1 : 0) : (rng() < 0.65 ? -1 : 0); break;
+          case 'valley':  delta = n < 4 ? (rng() < 0.65 ? -1 : 0) : (rng() < 0.65 ? 1 : 0); break;
+          default:        delta = Math.round((rng() - 0.5) * 2); break;  // −1, 0, +1
+        }
+        // Occasionally a ±2 leap (still within pentatonic = consonant skip-3rd)
+        if (rng() < 0.18) delta *= 2;
+
+        pos = Math.max(rMin, Math.min(rMax, pos + delta));
+        pat.push(PENTA[pos]);
       }
-      // Guarantee at least one note per pattern
-      if (!pat.some(Boolean)) pat[Math.floor(rng() * 8)] = pickNote();
+
+      // Guarantee at least one sounding note per pattern
+      if (!pat.some(Boolean)) {
+        const gi = Math.floor(rng() * 8);
+        pat[gi] = PENTA[pos];
+      }
+
       patterns.push(pat);
+
+      // Between patterns: small register reset (±0 or ±2 steps, always stays in range)
+      const jump = [-2, -1, 0, 0, 1, 2][Math.floor(rng() * 6)];
+      pos = Math.max(rMin, Math.min(rMax, pos + jump));
     }
 
     return { patterns, bpm };
