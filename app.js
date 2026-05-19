@@ -231,6 +231,61 @@ function computeGlockBuffer(ac, freq, velocity = 0.7, durationSec = 4.5) {
   return buf;
 }
 
+// Music box (オルゴール) — cantilever beam tine, plucked by a rotating pin
+// Cantilever overtone ratios: 1.000, 6.267, 17.55 (far more inharmonic than glockenspiel)
+// Result: mostly fundamental sustain; overtones vanish in milliseconds → delicate, intimate
+function computeOrgolBuffer(ac, freq, velocity = 0.7, durationSec = 2.8) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * durationSec);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+
+  // Cantilever beam modes — empirical ratios for a fixed-free metal tine
+  const modes = [
+    [1.000,  0.80, 0.26],   // fundamental — present throughout, gentle decay
+    [6.267,  0.13, 11.0],   // 2nd mode — brief metallic click at attack
+    [17.55,  0.03, 32.0],   // 3rd mode — sub-millisecond shimmer only
+  ];
+
+  const phi  = Math.random() * Math.PI * 2;
+  // Slight detuned voice (+1.0 ¢) simulates mechanical imperfection of the tine
+  const fDet = freq * 1.000579;
+
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    let s = 0;
+
+    modes.forEach(([ratio, amp, dc], mi) => {
+      const f = freq * ratio;
+      if (f >= sr * 0.45) return;
+      s += amp * Math.exp(-dc * t) * Math.sin(2 * Math.PI * f * t + phi * (mi + 1) * 0.5);
+    });
+
+    // Detuned tine: soft beating creates the delicate "living" quality of a real music box
+    const envFund = Math.exp(-0.28 * t);
+    s += 0.14 * envFund * Math.sin(2 * Math.PI * fDet * t + phi * 2.3);
+
+    // Pin pluck transient: crisp but very soft (no hammer — just a gentle pin catch)
+    if (i < Math.round(sr * 0.003)) {
+      const atkNorm = i / Math.round(sr * 0.003);
+      s += (Math.random() * 2 - 1) * 0.012 * velocity * Math.exp(-atkNorm * 22);
+    }
+
+    d[i] = s * velocity;
+  }
+
+  let peak = 0;
+  for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
+  if (peak > 0.01) {
+    const fo = Math.min(sr * 0.35, len);
+    for (let i = 0; i < len; i++) {
+      d[i] = d[i] / peak * 0.60;
+      if (i > len - fo) d[i] *= (len - i) / fo;
+    }
+  }
+  return buf;
+}
+
 // ─── Presets ────────────────────────────────────────────────────────────────
 
 const MOOD_LABELS = [
@@ -585,6 +640,13 @@ const PRESETS = {
               [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
               [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
             ], bpm:77, startDelay:16, vol:0.22 },
+          { type:'orgol',     name:'オルゴール',         icon:'🎶',
+            patterns:[
+              [_.C5, null, null, null, _.G4, null, null, null],
+              [null, _.E5, null, null, null, _.C5, null, null],
+              [_.G4, null, null, _.C5, null, null, _.E5, null],
+              [_.C5, null, null, null, null, null, _.G4, null],
+            ], bpm:60, startDelay:26, vol:0.17 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.50 },
@@ -619,6 +681,13 @@ const PRESETS = {
               [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
               [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
             ], bpm:77, startDelay:16, vol:0.22 },
+          { type:'orgol',     name:'オルゴール',          icon:'🎶',
+            patterns:[
+              [_.C5, null, null, null, _.G4, null, null, null],
+              [null, _.E5, null, null, null, _.C5, null, null],
+              [_.G4, null, null, _.C5, null, null, _.E5, null],
+              [_.C5, null, null, null, null, null, _.G4, null],
+            ], bpm:60, startDelay:26, vol:0.17 },
           { type:'wind',      name:'風の音',              icon:'🍃', vol:0.16 },
         ]},
         { name: 'ジャーニー', journey: true, layers: [
@@ -646,6 +715,13 @@ const PRESETS = {
               [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
               [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
             ], bpm:77, startDelay:20, vol:0.20 },
+          { type:'orgol',    name:'オルゴール',            icon:'🎶',
+            patterns:[
+              [_.C5, null, null, null, _.G4, null, null, null],
+              [null, _.E5, null, null, null, _.C5, null, null],
+              [_.G4, null, null, _.C5, null, null, _.E5, null],
+              [_.C5, null, null, null, null, null, _.G4, null],
+            ], bpm:60, startDelay:32, vol:0.16 },
         ]},
       ]
     },
@@ -2958,6 +3034,42 @@ class HealingApp {
     this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
   }
 
+  _scheduleOrgolNotes(patterns, bpm, destGain, startDelaySec = 20) {
+    const beatMs = (60 / bpm) * 1000;
+    const maxLen = Math.max(...patterns.map(p => p.length));
+    const REST   = Array(maxLen).fill(null);
+    let patIdx = 0, noteIdx = 0, curPat = patterns[0];
+
+    const tick = () => {
+      if (!this.isPlaying) return;
+      const freq = curPat[noteIdx];
+      if (freq) {
+        const velocity = 0.24 + Math.random() * 0.28;  // very soft, intimate
+        const dur      = 2.5 + Math.random() * 0.5;
+        const buf = computeOrgolBuffer(this.ac, freq, velocity, dur);
+        const src = this.ac.createBufferSource();
+        src.buffer = buf;
+        const nG = this.ac.createGain();
+        nG.gain.value = velocity;
+        src.connect(nG);
+        nG.connect(destGain);
+        src.start();
+        src.stop(this.ac.currentTime + dur + 0.3);
+      }
+      noteIdx++;
+      if (noteIdx >= curPat.length) {
+        noteIdx = 0;
+        patIdx  = (patIdx + 1) % patterns.length;
+        // 18% chance of extra silence between patterns — music boxes sometimes stutter
+        curPat  = Math.random() < 0.18 ? REST : patterns[patIdx];
+      }
+      // Music boxes have slightly uneven timing from the pin drum rotation
+      const humanMs = beatMs * (0.94 + Math.random() * 0.12);
+      this.schedulerTmrs.push(setTimeout(tick, humanMs));
+    };
+    this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
+  }
+
   _scheduleGlockNotes(patterns, bpm, destGain, startDelaySec = 8) {
     const beatMs = (60 / bpm) * 1000;
     const maxLen = Math.max(...patterns.map(p => p.length));
@@ -3195,6 +3307,15 @@ class HealingApp {
           g.connect(this.reverbSend);
           this.layers.push({ name: def.name, icon: def.icon, gainNode: g, nodes: [], defaultVol: def.vol });
           this._scheduleGlockNotes(def.patterns, def.bpm, g, def.startDelay || 8);
+          break;
+        }
+        case 'orgol': {
+          const g = this.ac.createGain();
+          g.gain.value = 0;
+          g.connect(this.dryBus);
+          g.connect(this.reverbSend);
+          this.layers.push({ name: def.name, icon: def.icon, gainNode: g, nodes: [], defaultVol: def.vol });
+          this._scheduleOrgolNotes(def.patterns, def.bpm, g, def.startDelay || 20);
           break;
         }
         case 'piano': {
