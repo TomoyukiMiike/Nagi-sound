@@ -183,6 +183,54 @@ function computePianoBuffer(ac, freq, velocity = 0.7, durationSec = 5.5) {
   return buf;
 }
 
+// Glockenspiel (music box) — inharmonic bar modes, empirical ratios for a free-free bar
+// These non-integer ratios give the characteristic bell-metal shimmer of No Surprises
+function computeGlockBuffer(ac, freq, velocity = 0.7, durationSec = 4.5) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * durationSec);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+
+  // [ratio, amplitude, decay_rate_1/s] — empirical free-free bar overtones
+  const modes = [
+    [1.000,  0.72, 0.13],   // fundamental — warm, long sustain
+    [2.756,  0.18, 1.90],   // 2nd flexural mode — metallic edge
+    [5.404,  0.06, 5.50],   // 3rd mode — bright attack bite
+    [8.933,  0.015, 12.0],  // 4th mode — present only in first milliseconds
+  ];
+
+  const phi    = Math.random() * Math.PI * 2;
+  const fadeIn = Math.round(sr * 0.001);  // 1 ms — near-instant (soft mallet)
+
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    let s = 0;
+    modes.forEach(([ratio, amp, dc], mi) => {
+      const f = freq * ratio;
+      if (f >= sr * 0.45) return;
+      s += amp * Math.exp(-dc * t) * Math.sin(2 * Math.PI * f * t + phi * (mi + 1) * 0.61);
+    });
+    // Soft mallet transient (gentler than piano hammer)
+    if (i < Math.round(sr * 0.004)) {
+      const atkNorm = i / Math.round(sr * 0.004);
+      s += (Math.random() * 2 - 1) * 0.025 * velocity * Math.exp(-atkNorm * 15);
+    }
+    if (i < fadeIn) s *= i / fadeIn;
+    d[i] = s * velocity;
+  }
+
+  let peak = 0;
+  for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
+  if (peak > 0.01) {
+    const fo = Math.min(sr * 0.55, len);
+    for (let i = 0; i < len; i++) {
+      d[i] = d[i] / peak * 0.65;
+      if (i > len - fo) d[i] *= (len - i) / fo;
+    }
+  }
+  return buf;
+}
+
 // ─── Presets ────────────────────────────────────────────────────────────────
 
 const MOOD_LABELS = [
@@ -510,57 +558,67 @@ const PRESETS = {
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.54 },
           { type:'harp',      name:'ハープ',            icon:'🪕',
             patterns:[
-              [132, null, 176, null, null],
-              [null, 198, null, 132, null],
-              [176, null, null, 264, null],
               [132, null, 198, null, null],
-            ], bpm:15, startDelay:7, vol:0.38 },
+              [null, 132, null, 198, null],
+              [132, null, 165, null, null],
+              [null, 132, null, 176, null],
+            ], bpm:15, startDelay:7, vol:0.36 },
           { type:'piano', name:'ソフトピアノ', icon:'🎹',
             patterns:[
-              [132,  null, null, null, null, null, 198,  null],
-              [null, null, null, 165,  null, null, null, null],
-              [132,  null, null, null, 198,  null, null, null],
-              [null, null, 132,  null, null, null, null, 165 ],
-            ], bpm:7, startDelay:10, vol:0.32 },
-          { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:22000, vol:0.46 },
+              [_.E3, _.G3, null, null, _.C4, null, null, null],
+              [_.C4, null, _.E4, null, _.G4, null, null, null],
+              [_.G4, null, null, null, _.C5, null, null, null],
+              [null, _.E4, null, _.C4, null, _.G3, null, _.E3],
+            ], bpm:7, startDelay:10, vol:0.30 },
+          { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:28000, vol:0.36 },
           { type:'guitar',    name:'アコギアルペジオ',   icon:'🎸',
             patterns:[
-              // ゆりかご: C4 を中心にアーチ型 — 3拍の間を置いて静かに揺れる
-              [_.C4, null, null, _.E4, null, null, _.G4, null, null, _.E4, null, null, _.C4, null, null, null],
-              // 昇る息吹: E3→G3→C4→E4 をゆっくり上昇 — 4拍の間を置いて希望が芽生える
-              [_.E3, null, null, null, _.G3, null, null, null, _.C4, null, null, null, _.E4, null, null, null],
-              // 静かな下降: G4→E4→C4→G3→E3 — 穏やかに着地する
-              [_.G4, null, null, _.E4, null, null, _.C4, null, null, _.G3, null, null, _.E3, null, null, null],
-              // 揺れ: G3←→C4←→E4 — 小さな振れ幅でゆっくり揺れ続ける
-              [_.G3, null, null, _.C4, null, null, _.E4, null, _.C4, null, _.G3, null, _.C4, null, null, null],
-            ], bpm:116, startDelay:8, vol:0.28 },
+              [_.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3, _.C4],
+              [_.G3, _.C4, _.G3, _.E3, _.C3, _.E3, _.G3, _.C4],
+              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
+              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
+            ], bpm:77, startDelay:8, vol:0.28 },
+          { type:'glock',     name:'オルゴール',         icon:'🎵',
+            patterns:[
+              [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
+              [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
+              [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
+              [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
+            ], bpm:77, startDelay:16, vol:0.22 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.50 },
           { type:'organ',     name:'オルガン',           icon:'🎹', baseFreq:99.0, vol:0.52 },
           { type:'solfeggio', name:'528Hz ソルフェジオ', icon:'✦',  vol:0.54 },
           { type:'harp',      name:'ハープ',             icon:'🪕',
-            patterns:[[132,null,176,null,null],[null,198,null,132,null],[176,null,null,264,null],[132,null,198,null,null]],
-            bpm:15, startDelay:7, vol:0.38 },
+            patterns:[
+              [132, null, 198, null, null],
+              [null, 132, null, 198, null],
+              [132, null, 165, null, null],
+              [null, 132, null, 176, null],
+            ], bpm:15, startDelay:7, vol:0.36 },
           { type:'piano', name:'ソフトピアノ', icon:'🎹',
             patterns:[
-              [132,  null, null, null, null, null, 198,  null],
-              [null, null, null, 165,  null, null, null, null],
-              [132,  null, null, null, 198,  null, null, null],
-              [null, null, 132,  null, null, null, null, 165 ],
-            ], bpm:7, startDelay:10, vol:0.32 },
-          { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:22000, vol:0.46 },
+              [_.E3, _.G3, null, null, _.C4, null, null, null],
+              [_.C4, null, _.E4, null, _.G4, null, null, null],
+              [_.G4, null, null, null, _.C5, null, null, null],
+              [null, _.E4, null, _.C4, null, _.G3, null, _.E3],
+            ], bpm:7, startDelay:10, vol:0.30 },
+          { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:28000, vol:0.36 },
           { type:'guitar',    name:'アコギアルペジオ',    icon:'🎸',
             patterns:[
-              // ゆりかご: C4 を中心にアーチ型 — 3拍の間を置いて静かに揺れる
-              [_.C4, null, null, _.E4, null, null, _.G4, null, null, _.E4, null, null, _.C4, null, null, null],
-              // 昇る息吹: E3→G3→C4→E4 をゆっくり上昇 — 4拍の間を置いて希望が芽生える
-              [_.E3, null, null, null, _.G3, null, null, null, _.C4, null, null, null, _.E4, null, null, null],
-              // 静かな下降: G4→E4→C4→G3→E3 — 穏やかに着地する
-              [_.G4, null, null, _.E4, null, null, _.C4, null, null, _.G3, null, null, _.E3, null, null, null],
-              // 揺れ: G3←→C4←→E4 — 小さな振れ幅でゆっくり揺れ続ける
-              [_.G3, null, null, _.C4, null, null, _.E4, null, _.C4, null, _.G3, null, _.C4, null, null, null],
-            ], bpm:116, startDelay:8, vol:0.28 },
+              [_.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3, _.C4],
+              [_.G3, _.C4, _.G3, _.E3, _.C3, _.E3, _.G3, _.C4],
+              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
+              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
+            ], bpm:77, startDelay:8, vol:0.28 },
+          { type:'glock',     name:'オルゴール',          icon:'🎵',
+            patterns:[
+              [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
+              [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
+              [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
+              [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
+            ], bpm:77, startDelay:16, vol:0.22 },
           { type:'wind',      name:'風の音',              icon:'🍃', vol:0.16 },
         ]},
         { name: 'ジャーニー', journey: true, layers: [
@@ -568,19 +626,26 @@ const PRESETS = {
           { type:'organ',    name:'オルガン',            icon:'🎹', baseFreq:98.0, vol:0.40 },
           { type:'noise',    name:'ブラウンノイズ',       icon:'🌫️', noiseType:'brown', vol:0.28 },
           { type:'harp',     name:'ハープ',              icon:'🪕',
-            patterns:[[132,null,176,null,null],[null,198,null,132,null],[176,null,null,264,null],[null,132,null,198,null]],
-            bpm:10, startDelay:10, vol:0.28 },
+            patterns:[
+              [132, null, 198, null, null],
+              [null, 132, null, 198, null],
+              [132, null, 165, null, null],
+              [null, 132, null, 176, null],
+            ], bpm:10, startDelay:10, vol:0.26 },
           { type:'guitar',   name:'アコギアルペジオ',    icon:'🎸',
             patterns:[
-              // ゆりかご
-              [_.C4, null, null, _.E4, null, null, _.G4, null, null, _.E4, null, null, _.C4, null, null, null],
-              // 昇る息吹
-              [_.E3, null, null, null, _.G3, null, null, null, _.C4, null, null, null, _.E4, null, null, null],
-              // 静かな下降
-              [_.G4, null, null, _.E4, null, null, _.C4, null, null, _.G3, null, null, _.E3, null, null, null],
-              // 揺れ
-              [_.G3, null, null, _.C4, null, null, _.E4, null, _.C4, null, _.G3, null, _.C4, null, null, null],
-            ], bpm:116, startDelay:12, vol:0.24 },
+              [_.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3, _.C4],
+              [_.G3, _.C4, _.G3, _.E3, _.C3, _.E3, _.G3, _.C4],
+              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
+              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
+            ], bpm:77, startDelay:12, vol:0.24 },
+          { type:'glock',    name:'オルゴール',           icon:'🎵',
+            patterns:[
+              [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
+              [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
+              [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
+              [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
+            ], bpm:77, startDelay:20, vol:0.20 },
         ]},
       ]
     },
@@ -2792,7 +2857,7 @@ class HealingApp {
     this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
   }
 
-  _schedulePianoNotes(patterns, bpm, destGain, startDelaySec = 4) {
+  _schedulePianoNotes(patterns, bpm, destGain, startDelaySec = 4, addChords = true) {
     const beatMs = (60 / bpm) * 1000;
     const maxLen = Math.max(...patterns.map(p => p.length));
     const REST   = Array(maxLen).fill(null);
@@ -2817,55 +2882,57 @@ class HealingApp {
         src.start();
         src.stop(this.ac.currentTime + dur + 0.5);
 
-        // ── Harmonic chord voicing ────────────────────────────────────────
-        // All intervals are Just Intonation ratios → zero beating, maximum consonance.
+        if (addChords) {
+          // ── Harmonic chord voicing ────────────────────────────────────────
+          // All intervals are Just Intonation ratios → zero beating, maximum consonance.
 
-        // Bass octave (freq/2): 55% chance when note is above G3 (198 Hz)
-        // Grounds the melody with a warm sub-tone without getting muddy in bass.
-        if (Math.random() < 0.55 && freq > 198) {
-          const bassFreq = freq / 2;
-          const bassBuf  = computePianoBuffer(this.ac, bassFreq, velocity * 0.30, dur * 1.3);
-          const bassS    = this.ac.createBufferSource();
-          bassS.buffer   = bassBuf;
-          const bassG    = this.ac.createGain();
-          bassG.gain.value = velocity * 0.30;
-          bassS.connect(bassG);
-          bassG.connect(destGain);
-          bassS.start();
-          bassS.stop(this.ac.currentTime + dur * 1.3 + 0.5);
-        }
-
-        // Major 3rd (×5/4): 42% chance — the warmest, most emotionally resonant interval.
-        // In JI this is a pure 5:4 ratio, perfectly in tune with the overtone series.
-        if (Math.random() < 0.42) {
-          const thirdFreq = freq * 5 / 4;
-          if (thirdFreq < 660) {  // stay below E5 to avoid shrillness
-            const thirdBuf = computePianoBuffer(this.ac, thirdFreq, velocity * 0.24, dur * 0.88);
-            const thirdS   = this.ac.createBufferSource();
-            thirdS.buffer  = thirdBuf;
-            const thirdG   = this.ac.createGain();
-            thirdG.gain.value = velocity * 0.24;
-            thirdS.connect(thirdG);
-            thirdG.connect(destGain);
-            thirdS.start();
-            thirdS.stop(this.ac.currentTime + dur * 0.88 + 0.5);
+          // Bass octave (freq/2): 55% chance when note is above G3 (198 Hz)
+          // Grounds the melody with a warm sub-tone without getting muddy in bass.
+          if (Math.random() < 0.55 && freq > 198) {
+            const bassFreq = freq / 2;
+            const bassBuf  = computePianoBuffer(this.ac, bassFreq, velocity * 0.30, dur * 1.3);
+            const bassS    = this.ac.createBufferSource();
+            bassS.buffer   = bassBuf;
+            const bassG    = this.ac.createGain();
+            bassG.gain.value = velocity * 0.30;
+            bassS.connect(bassG);
+            bassG.connect(destGain);
+            bassS.start();
+            bassS.stop(this.ac.currentTime + dur * 1.3 + 0.5);
           }
-        }
 
-        // Perfect 5th (×3/2): 26% chance — open, pure, reinforces the overtone series.
-        // The 3:2 ratio is the most consonant interval after the octave.
-        if (Math.random() < 0.26) {
-          const fifthFreq = freq * 3 / 2;
-          if (fifthFreq < 660) {
-            const fifthBuf = computePianoBuffer(this.ac, fifthFreq, velocity * 0.17, dur * 0.82);
-            const fifthS   = this.ac.createBufferSource();
-            fifthS.buffer  = fifthBuf;
-            const fifthG   = this.ac.createGain();
-            fifthG.gain.value = velocity * 0.17;
-            fifthS.connect(fifthG);
-            fifthG.connect(destGain);
-            fifthS.start();
-            fifthS.stop(this.ac.currentTime + dur * 0.82 + 0.5);
+          // Major 3rd (×5/4): 42% chance — the warmest, most emotionally resonant interval.
+          // In JI this is a pure 5:4 ratio, perfectly in tune with the overtone series.
+          if (Math.random() < 0.42) {
+            const thirdFreq = freq * 5 / 4;
+            if (thirdFreq < 660) {  // stay below E5 to avoid shrillness
+              const thirdBuf = computePianoBuffer(this.ac, thirdFreq, velocity * 0.24, dur * 0.88);
+              const thirdS   = this.ac.createBufferSource();
+              thirdS.buffer  = thirdBuf;
+              const thirdG   = this.ac.createGain();
+              thirdG.gain.value = velocity * 0.24;
+              thirdS.connect(thirdG);
+              thirdG.connect(destGain);
+              thirdS.start();
+              thirdS.stop(this.ac.currentTime + dur * 0.88 + 0.5);
+            }
+          }
+
+          // Perfect 5th (×3/2): 26% chance — open, pure, reinforces the overtone series.
+          // The 3:2 ratio is the most consonant interval after the octave.
+          if (Math.random() < 0.26) {
+            const fifthFreq = freq * 3 / 2;
+            if (fifthFreq < 660) {
+              const fifthBuf = computePianoBuffer(this.ac, fifthFreq, velocity * 0.17, dur * 0.82);
+              const fifthS   = this.ac.createBufferSource();
+              fifthS.buffer  = fifthBuf;
+              const fifthG   = this.ac.createGain();
+              fifthG.gain.value = velocity * 0.17;
+              fifthS.connect(fifthG);
+              fifthG.connect(destGain);
+              fifthS.start();
+              fifthS.stop(this.ac.currentTime + dur * 0.82 + 0.5);
+            }
           }
         }
       }
@@ -2888,6 +2955,40 @@ class HealingApp {
       this.schedulerTmrs.push(setTimeout(tick, humanMs + jitter));
     };
 
+    this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
+  }
+
+  _scheduleGlockNotes(patterns, bpm, destGain, startDelaySec = 8) {
+    const beatMs = (60 / bpm) * 1000;
+    const maxLen = Math.max(...patterns.map(p => p.length));
+    const REST   = Array(maxLen).fill(null);
+    let patIdx = 0, noteIdx = 0, curPat = patterns[0];
+
+    const tick = () => {
+      if (!this.isPlaying) return;
+      const freq = curPat[noteIdx];
+      if (freq) {
+        const velocity = 0.30 + Math.random() * 0.34;
+        const dur      = 4.0 + Math.random() * 0.8;
+        const buf = computeGlockBuffer(this.ac, freq, velocity, dur);
+        const src = this.ac.createBufferSource();
+        src.buffer = buf;
+        const nG = this.ac.createGain();
+        nG.gain.value = velocity;
+        src.connect(nG);
+        nG.connect(destGain);
+        src.start();
+        src.stop(this.ac.currentTime + dur + 0.4);
+      }
+      noteIdx++;
+      if (noteIdx >= curPat.length) {
+        noteIdx = 0;
+        patIdx  = (patIdx + 1) % patterns.length;
+        curPat  = Math.random() < 0.12 ? REST : patterns[patIdx];
+      }
+      const humanMs = beatMs * (0.97 + Math.random() * 0.06);
+      this.schedulerTmrs.push(setTimeout(tick, humanMs));
+    };
     this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
   }
 
@@ -3087,6 +3188,15 @@ class HealingApp {
           this._scheduleGuitarArp(def.patterns, def.bpm, g, def.startDelay || 6);
           break;
         }
+        case 'glock': {
+          const g = this.ac.createGain();
+          g.gain.value = 0;
+          g.connect(this.dryBus);
+          g.connect(this.reverbSend);
+          this.layers.push({ name: def.name, icon: def.icon, gainNode: g, nodes: [], defaultVol: def.vol });
+          this._scheduleGlockNotes(def.patterns, def.bpm, g, def.startDelay || 8);
+          break;
+        }
         case 'piano': {
           const g = this.ac.createGain();
           g.gain.value = 0;
@@ -3096,9 +3206,9 @@ class HealingApp {
           if (this._melodyOn) {
             const hour = this._getHour();
             const { patterns: mPat, bpm: mBpm } = this._getMelodyPianoPatterns(cat, hour, this._weatherCategory);
-            this._schedulePianoNotes(mPat, mBpm, g, def.startDelay || 5);
+            this._schedulePianoNotes(mPat, mBpm, g, def.startDelay || 5, false);
           } else {
-            this._schedulePianoNotes(def.patterns, def.bpm, g, def.startDelay || 5);
+            this._schedulePianoNotes(def.patterns, def.bpm, g, def.startDelay || 5, true);
           }
           break;
         }
@@ -3576,29 +3686,30 @@ class HealingApp {
       _.C5, _.D5, _.E5, _.G5, _.A5,   // idx 10–14
     ];
 
-    // ── Category: usable index range within PENTA ──
-    // (kept tight to 1-1.5 octaves to avoid wild jumps within a pattern)
-    const catRange = {
-      morning:    [3,  11],   // G3–E5  bright, spread
-      relax:      [0,   9],   // C3–A4  comfortable mid
-      meditation: [0,   9],   // C3–A4  calm, centred
-      focus:      [4,  12],   // A3–G5  clear, slightly high
-      presleep:   [0,   7],   // C3–E4  low, drowsy
-      sleep:      [0,   6],   // C3–C4  very low, minimal
-      walk:       [2,  11],   // E3–E5  natural spread
+    // ── Category: usable note pools (pure pentatonic) ──
+    const pools = {
+      morning:    { low:[_.C3,_.E3,_.G3],      mid:[_.C4,_.E4,_.G4,_.A4],  high:[_.C5,_.E5,_.G5]  },
+      relax:      { low:[_.C3,_.G3,_.A3],       mid:[_.C4,_.G4,_.A4],       high:[_.C5,_.A5]        },
+      meditation: { low:[_.C3,_.G3,_.A3],       mid:[_.C4,_.E4,_.G4,_.A4],  high:[_.C5,_.E5,_.A5]  },
+      focus:      { low:[_.C3,_.E3,_.G3],       mid:[_.C4,_.E4,_.G4],       high:[_.C5,_.E5,_.G5]  },
+      presleep:   { low:[_.C3,_.G3,_.A3],       mid:[_.C4,_.G4,_.A4],       high:[_.C5]             },
+      sleep:      { low:[_.C3,_.G3],            mid:[_.C4,_.E4,_.G4],       high:[_.C5]             },
+      walk:       { low:[_.C3,_.E3,_.G3,_.A3],  mid:[_.C4,_.E4,_.G4],       high:[_.C5,_.E5]        },
     };
-    let [rMin, rMax] = catRange[cat] || catRange.relax;
+    const catPool = pools[cat] || pools.relax;
+    const PENTA_FILTERED = [...catPool.low, ...catPool.mid, ...catPool.high];
+    let rMin = 0, rMax = PENTA_FILTERED.length - 1;
 
     // Time: predawn/night pull lower; morning pulls higher
     const segShift = [-2, 1, 0, -1, -2][seg];
     rMin = Math.max(0,            rMin + segShift);
-    rMax = Math.min(PENTA.length - 1, rMax + segShift);
+    rMax = Math.min(PENTA_FILTERED.length - 1, rMax + segShift);
 
     // Weather: clear → up 1 step, rainy → down 1 step
     const wShift = weather === 'clear' ? 1 : weather === 'rainy' ? -1 : 0;
     rMin = Math.max(0,            rMin + wShift);
-    rMax = Math.min(PENTA.length - 1, rMax + wShift);
-    if (rMin >= rMax) rMax = Math.min(PENTA.length - 1, rMin + 3);
+    rMax = Math.min(PENTA_FILTERED.length - 1, rMax + wShift);
+    if (rMin >= rMax) rMax = Math.min(PENTA_FILTERED.length - 1, rMin + 3);
 
     // ── Density ──
     const baseDensity = [0.25, 0.50, 0.45, 0.38, 0.22][seg];
@@ -3646,13 +3757,13 @@ class HealingApp {
         if (rng() < 0.18) delta *= 2;
 
         pos = Math.max(rMin, Math.min(rMax, pos + delta));
-        pat.push(PENTA[pos]);
+        pat.push(PENTA_FILTERED[pos]);
       }
 
       // Guarantee at least one sounding note per pattern
       if (!pat.some(Boolean)) {
         const gi = Math.floor(rng() * 8);
-        pat[gi] = PENTA[pos];
+        pat[gi] = PENTA_FILTERED[pos];
       }
 
       patterns.push(pat);
@@ -4901,18 +5012,24 @@ class HealingApp {
     // ── Show initial canvas animation for the selected mode ──
     this._startVisuals(this._uiCat);
 
-    // ── Resume AudioContext when app returns from background (iOS fix) ──
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && this.isPlaying && this.ac && this.ac.state === 'suspended') {
-        this.ac.resume();
-      }
-    });
-
     // ── Icon brightness: apply immediately, then every 60 s ──
     this._applyIconBrightness();
     this._iconBrightTimer = setInterval(() => this._applyIconBrightness(), 60_000);
     // Fetch geo → accurate sunrise/sunset (async, non-blocking)
     this._fetchWeather();
+
+    // ── Resume AudioContext when returning from background (iOS/Android fix) ──
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && this.ac && this.ac.state === 'suspended') {
+        this.ac.resume().catch(() => {});
+      }
+    });
+    // Also resume on any user interaction (belt-and-suspenders for iOS)
+    const resumeOnTouch = () => {
+      if (this.ac && this.ac.state === 'suspended') this.ac.resume().catch(() => {});
+    };
+    document.addEventListener('touchstart', resumeOnTouch, { passive: true });
+    document.addEventListener('click',      resumeOnTouch, { passive: true });
   }
 }
 
