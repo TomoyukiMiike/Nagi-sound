@@ -578,7 +578,7 @@ const PRESETS = {
               [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
               [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
             ], bpm:77, startDelay:8, vol:0.28 },
-          { type:'glock',     name:'オルゴール',         icon:'🎵',
+          { type:'glock',     name:'グロッケン',         icon:'🎵',
             patterns:[
               [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
               [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
@@ -612,7 +612,7 @@ const PRESETS = {
               [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
               [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
             ], bpm:77, startDelay:8, vol:0.28 },
-          { type:'glock',     name:'オルゴール',          icon:'🎵',
+          { type:'glock',     name:'グロッケン',          icon:'🎵',
             patterns:[
               [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
               [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
@@ -639,7 +639,7 @@ const PRESETS = {
               [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
               [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
             ], bpm:77, startDelay:12, vol:0.24 },
-          { type:'glock',    name:'オルゴール',           icon:'🎵',
+          { type:'glock',    name:'グロッケン',           icon:'🎵',
             patterns:[
               [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
               [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
