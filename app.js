@@ -499,6 +499,13 @@ const PRESETS = {
               [null, null, 132,  null, null, null, null, 165 ],
             ], bpm:7, startDelay:10, vol:0.32 },
           { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:22000, vol:0.46 },
+          { type:'guitar',    name:'アコギアルペジオ',   icon:'🎸',
+            patterns:[
+              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
+              [_.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3],
+              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3],
+              [_.E3, _.C4, _.G3, _.E4, _.C4, _.G4, _.E4, _.C4],
+            ], bpm:116, startDelay:8, vol:0.28 },
         ]},
         { name:'ディープ', layers: [
           { type:'binaural',  name:'バイノーラル θ→δ',  icon:'〜', base:264, beat:7, driftTo:1.5, driftDuration:2700, vol:0.50 },
@@ -515,6 +522,13 @@ const PRESETS = {
               [null, null, 132,  null, null, null, null, 165 ],
             ], bpm:7, startDelay:10, vol:0.32 },
           { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:22000, vol:0.46 },
+          { type:'guitar',    name:'アコギアルペジオ',    icon:'🎸',
+            patterns:[
+              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
+              [_.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3],
+              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3],
+              [_.E3, _.C4, _.G3, _.E4, _.C4, _.G4, _.E4, _.C4],
+            ], bpm:116, startDelay:8, vol:0.28 },
           { type:'wind',      name:'風の音',              icon:'🍃', vol:0.16 },
         ]},
         { name: 'ジャーニー', journey: true, layers: [
@@ -524,6 +538,13 @@ const PRESETS = {
           { type:'harp',     name:'ハープ',              icon:'🪕',
             patterns:[[132,null,176,null,null],[null,198,null,132,null],[176,null,null,264,null],[null,132,null,198,null]],
             bpm:10, startDelay:10, vol:0.28 },
+          { type:'guitar',   name:'アコギアルペジオ',    icon:'🎸',
+            patterns:[
+              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
+              [_.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3],
+              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3],
+              [_.E3, _.C4, _.G3, _.E4, _.C4, _.G4, _.E4, _.C4],
+            ], bpm:116, startDelay:12, vol:0.24 },
         ]},
       ]
     },
@@ -1780,6 +1801,57 @@ PRESETS.walk = [
   },
 ];
 
+// Acoustic guitar additive synthesis — plucked string with body resonance
+function computeGuitarBuffer(ac, freq, velocity = 0.7, durationSec = 3.5) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * durationSec);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+
+  // Guitar: bright pluck → fast high-partial decay, warm fundamental sustain
+  const partials = [
+    [1, 0.58, 0.70,  0.038],  // [n, amp, fastDecay/s, slowDecay/s]
+    [2, 0.26, 2.00,  0.160],
+    [3, 0.13, 4.80,  0.420],
+    [4, 0.07, 8.00,  0.800],
+    [5, 0.035,12.50, 1.300],
+    [6, 0.015,18.00, 2.000],
+  ];
+
+  const B   = 0.00018 * Math.max(1, freq / 220);  // slight inharmonicity
+  const phi = Math.random() * Math.PI * 2;
+  const atk = Math.round(sr * 0.001);              // 1 ms crisp attack
+
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    let s = 0;
+    partials.forEach(([n, amp, fd, sd]) => {
+      const f = freq * n * Math.sqrt(1 + B * n * n);
+      if (f >= sr * 0.45) return;
+      s += amp * (0.52 * Math.exp(-fd * t) + 0.48 * Math.exp(-sd * t))
+               * Math.sin(2 * Math.PI * f * t + phi * n * 0.03);
+    });
+    // Pluck body click (very brief transient)
+    if (i < Math.round(sr * 0.010)) {
+      const norm = i / Math.round(sr * 0.010);
+      s += (Math.random() * 2 - 1) * 0.10 * velocity * Math.exp(-norm * 15);
+    }
+    if (i < atk) s *= i / atk;
+    d[i] = s * velocity;
+  }
+
+  let peak = 0;
+  for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
+  if (peak > 0.01) {
+    const fo = Math.min(sr * 0.4, len);
+    for (let i = 0; i < len; i++) {
+      d[i] = d[i] / peak * 0.68;
+      if (i > len - fo) d[i] *= (len - i) / fo;
+    }
+  }
+  return buf;
+}
+
 // ─── Main App ───────────────────────────────────────────────────────────────
 
 class HealingApp {
@@ -2561,8 +2633,8 @@ class HealingApp {
       src.buffer = this.soundBuffers.bowl;
       const env = ac.createGain();
       env.gain.setValueAtTime(0, now);
-      env.gain.linearRampToValueAtTime(0.90, now + 0.06);
-      env.gain.setTargetAtTime(0.0001, now + 1.0, 5.5);
+      env.gain.linearRampToValueAtTime(0.52, now + 0.18);
+      env.gain.setTargetAtTime(0.0001, now + 1.5, 4.2);
       src.connect(env);
       env.connect(destGain);
       env.connect(this.reverbSend);
@@ -2575,10 +2647,10 @@ class HealingApp {
       osc.type  = 'sine';
       osc.frequency.value = 432 * r;
       const env = ac.createGain();
-      const amp = 0.16 * Math.pow(0.42, i);
+      const amp = 0.10 * Math.pow(0.42, i);
       env.gain.setValueAtTime(0, now);
-      env.gain.linearRampToValueAtTime(amp, now + 0.4);
-      env.gain.setTargetAtTime(0.0001, now + 1.5, 2.8);
+      env.gain.linearRampToValueAtTime(amp, now + 0.8);
+      env.gain.setTargetAtTime(0.0001, now + 2.0, 2.2);
       osc.connect(env);
       env.connect(destGain);
       env.connect(this.reverbSend);
@@ -2745,6 +2817,46 @@ class HealingApp {
     this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
   }
 
+  _scheduleGuitarArp(patterns, bpm, destGain, startDelaySec = 6) {
+    const beatMs = (60 / bpm) * 1000;
+    const maxLen = Math.max(...patterns.map(p => p.length));
+    const REST   = Array(maxLen).fill(null);
+    let patIdx = 0, noteIdx = 0, curPat = patterns[0];
+
+    const tick = () => {
+      if (!this.isPlaying) return;
+
+      const freq = curPat[noteIdx];
+      if (freq) {
+        const velocity = 0.28 + Math.random() * 0.38;
+        const dur      = 2.4 + Math.random() * 0.8;
+        const buf = computeGuitarBuffer(this.ac, freq, velocity, dur);
+        const src = this.ac.createBufferSource();
+        src.buffer = buf;
+        const nG = this.ac.createGain();
+        nG.gain.value = velocity;
+        src.connect(nG);
+        nG.connect(destGain);
+        src.start();
+        src.stop(this.ac.currentTime + dur + 0.3);
+      }
+
+      noteIdx++;
+      if (noteIdx >= curPat.length) {
+        noteIdx = 0;
+        patIdx  = (patIdx + 1) % patterns.length;
+        // 8% chance of a brief silent rest between patterns
+        curPat = Math.random() < 0.08 ? REST : patterns[patIdx];
+      }
+
+      // Subtle human timing variation (tighter than piano — guitar is more rhythmic)
+      const humanMs = beatMs * (0.97 + Math.random() * 0.06);
+      this.schedulerTmrs.push(setTimeout(tick, humanMs));
+    };
+
+    this.schedulerTmrs.push(setTimeout(tick, startDelaySec * 1000));
+  }
+
   // ── Stops only layer nodes/schedulers; keeps AudioContext alive ───────────
   // Use this for mode/situation switches — avoids re-init and re-decode cost.
 
@@ -2890,6 +3002,15 @@ class HealingApp {
         case 'cricket': {
           const cr = this._makeCrickets();
           this.layers.push({ name: def.name, icon: def.icon, gainNode: cr.gainNode, nodes: cr.nodes, defaultVol: def.vol });
+          break;
+        }
+        case 'guitar': {
+          const g = this.ac.createGain();
+          g.gain.value = 0;
+          g.connect(this.dryBus);
+          g.connect(this.reverbSend);
+          this.layers.push({ name: def.name, icon: def.icon, gainNode: g, nodes: [], defaultVol: def.vol });
+          this._scheduleGuitarArp(def.patterns, def.bpm, g, def.startDelay || 6);
           break;
         }
         case 'piano': {
@@ -4705,6 +4826,13 @@ class HealingApp {
 
     // ── Show initial canvas animation for the selected mode ──
     this._startVisuals(this._uiCat);
+
+    // ── Resume AudioContext when app returns from background (iOS fix) ──
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && this.isPlaying && this.ac && this.ac.state === 'suspended') {
+        this.ac.resume();
+      }
+    });
 
     // ── Icon brightness: apply immediately, then every 60 s ──
     this._applyIconBrightness();
