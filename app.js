@@ -183,48 +183,54 @@ function computePianoBuffer(ac, freq, velocity = 0.7, durationSec = 5.5) {
   return buf;
 }
 
-// Glockenspiel (music box) — inharmonic bar modes, empirical ratios for a free-free bar
-// These non-integer ratios give the characteristic bell-metal shimmer of No Surprises
-function computeGlockBuffer(ac, freq, velocity = 0.7, durationSec = 4.5) {
+// 鉄琴 (Glockenspiel / Metallophone) — free-free metal bar, hard mallet
+// Used in Radiohead "No Surprises": bright, clear, bell-like tone with medium sustain.
+// Physical model: empirical overtone ratios for a uniform free-free metal bar.
+// Hard mallet → strong attack transient + boosted 2nd/3rd modes at onset.
+function computeGlockBuffer(ac, freq, velocity = 0.7, durationSec = 3.8) {
   const sr  = ac.sampleRate;
   const len = Math.round(sr * durationSec);
   const buf = ac.createBuffer(1, len, sr);
   const d   = buf.getChannelData(0);
 
-  // [ratio, amplitude, decay_rate_1/s] — empirical free-free bar overtones
+  // Free-free bar overtone ratios [ratio, amp, decay_1/s]
+  // Hard mallet boosts upper modes at attack → characteristic bright "ping"
   const modes = [
-    [1.000,  0.72, 0.13],   // fundamental — warm, long sustain
-    [2.756,  0.18, 1.90],   // 2nd flexural mode — metallic edge
-    [5.404,  0.06, 5.50],   // 3rd mode — bright attack bite
-    [8.933,  0.015, 12.0],  // 4th mode — present only in first milliseconds
+    [1.000,  0.65, 0.18],   // fundamental   — clear, medium sustain
+    [2.756,  0.28, 1.40],   // 2nd mode      — prominent metallic brightness (hard mallet)
+    [5.404,  0.10, 4.80],   // 3rd mode      — crisp bite at attack
+    [8.933,  0.03, 11.0],   // 4th mode      — high shimmer at the strike moment
+    [13.344, 0.008, 22.0],  // 5th mode      — barely audible "air" at impact
   ];
 
   const phi    = Math.random() * Math.PI * 2;
-  const fadeIn = Math.round(sr * 0.001);  // 1 ms — near-instant (soft mallet)
+  const atkLen = Math.round(sr * 0.006);  // 6 ms hard-mallet transient (longer than soft)
 
   for (let i = 0; i < len; i++) {
     const t = i / sr;
     let s = 0;
+
     modes.forEach(([ratio, amp, dc], mi) => {
       const f = freq * ratio;
       if (f >= sr * 0.45) return;
-      s += amp * Math.exp(-dc * t) * Math.sin(2 * Math.PI * f * t + phi * (mi + 1) * 0.61);
+      s += amp * Math.exp(-dc * t) * Math.sin(2 * Math.PI * f * t + phi * (mi + 1) * 0.58);
     });
-    // Soft mallet transient (gentler than piano hammer)
-    if (i < Math.round(sr * 0.004)) {
-      const atkNorm = i / Math.round(sr * 0.004);
-      s += (Math.random() * 2 - 1) * 0.025 * velocity * Math.exp(-atkNorm * 15);
+
+    // Hard mallet impact — louder and longer than soft mallet, the "knock" of metal on metal
+    if (i < atkLen) {
+      const atkNorm = i / atkLen;
+      s += (Math.random() * 2 - 1) * 0.055 * velocity * Math.exp(-atkNorm * 10);
     }
-    if (i < fadeIn) s *= i / fadeIn;
+
     d[i] = s * velocity;
   }
 
   let peak = 0;
   for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
   if (peak > 0.01) {
-    const fo = Math.min(sr * 0.55, len);
+    const fo = Math.min(sr * 0.50, len);
     for (let i = 0; i < len; i++) {
-      d[i] = d[i] / peak * 0.65;
+      d[i] = d[i] / peak * 0.68;
       if (i > len - fo) d[i] *= (len - i) / fo;
     }
   }
@@ -633,7 +639,7 @@ const PRESETS = {
               [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
               [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
             ], bpm:77, startDelay:8, vol:0.28 },
-          { type:'glock',     name:'グロッケン',         icon:'🎵',
+          { type:'glock',     name:'鉄琴',         icon:'🎵',
             patterns:[
               [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
               [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
@@ -674,7 +680,7 @@ const PRESETS = {
               [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
               [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
             ], bpm:77, startDelay:8, vol:0.28 },
-          { type:'glock',     name:'グロッケン',          icon:'🎵',
+          { type:'glock',     name:'鉄琴',          icon:'🎵',
             patterns:[
               [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
               [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
@@ -708,7 +714,7 @@ const PRESETS = {
               [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
               [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
             ], bpm:77, startDelay:12, vol:0.24 },
-          { type:'glock',    name:'グロッケン',           icon:'🎵',
+          { type:'glock',    name:'鉄琴',           icon:'🎵',
             patterns:[
               [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
               [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
