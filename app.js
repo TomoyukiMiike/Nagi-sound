@@ -525,10 +525,14 @@ const PRESETS = {
           { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:22000, vol:0.46 },
           { type:'guitar',    name:'アコギアルペジオ',   icon:'🎸',
             patterns:[
-              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
-              [_.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3],
-              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3],
-              [_.E3, _.C4, _.G3, _.E4, _.C4, _.G4, _.E4, _.C4],
+              // ゆりかご: C4 を中心にアーチ型 — 3拍の間を置いて静かに揺れる
+              [_.C4, null, null, _.E4, null, null, _.G4, null, null, _.E4, null, null, _.C4, null, null, null],
+              // 昇る息吹: E3→G3→C4→E4 をゆっくり上昇 — 4拍の間を置いて希望が芽生える
+              [_.E3, null, null, null, _.G3, null, null, null, _.C4, null, null, null, _.E4, null, null, null],
+              // 静かな下降: G4→E4→C4→G3→E3 — 穏やかに着地する
+              [_.G4, null, null, _.E4, null, null, _.C4, null, null, _.G3, null, null, _.E3, null, null, null],
+              // 揺れ: G3←→C4←→E4 — 小さな振れ幅でゆっくり揺れ続ける
+              [_.G3, null, null, _.C4, null, null, _.E4, null, _.C4, null, _.G3, null, _.C4, null, null, null],
             ], bpm:116, startDelay:8, vol:0.28 },
         ]},
         { name:'ディープ', layers: [
@@ -548,10 +552,14 @@ const PRESETS = {
           { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:22000, vol:0.46 },
           { type:'guitar',    name:'アコギアルペジオ',    icon:'🎸',
             patterns:[
-              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
-              [_.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3],
-              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3],
-              [_.E3, _.C4, _.G3, _.E4, _.C4, _.G4, _.E4, _.C4],
+              // ゆりかご: C4 を中心にアーチ型 — 3拍の間を置いて静かに揺れる
+              [_.C4, null, null, _.E4, null, null, _.G4, null, null, _.E4, null, null, _.C4, null, null, null],
+              // 昇る息吹: E3→G3→C4→E4 をゆっくり上昇 — 4拍の間を置いて希望が芽生える
+              [_.E3, null, null, null, _.G3, null, null, null, _.C4, null, null, null, _.E4, null, null, null],
+              // 静かな下降: G4→E4→C4→G3→E3 — 穏やかに着地する
+              [_.G4, null, null, _.E4, null, null, _.C4, null, null, _.G3, null, null, _.E3, null, null, null],
+              // 揺れ: G3←→C4←→E4 — 小さな振れ幅でゆっくり揺れ続ける
+              [_.G3, null, null, _.C4, null, null, _.E4, null, _.C4, null, _.G3, null, _.C4, null, null, null],
             ], bpm:116, startDelay:8, vol:0.28 },
           { type:'wind',      name:'風の音',              icon:'🍃', vol:0.16 },
         ]},
@@ -564,10 +572,14 @@ const PRESETS = {
             bpm:10, startDelay:10, vol:0.28 },
           { type:'guitar',   name:'アコギアルペジオ',    icon:'🎸',
             patterns:[
-              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
-              [_.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3],
-              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3],
-              [_.E3, _.C4, _.G3, _.E4, _.C4, _.G4, _.E4, _.C4],
+              // ゆりかご
+              [_.C4, null, null, _.E4, null, null, _.G4, null, null, _.E4, null, null, _.C4, null, null, null],
+              // 昇る息吹
+              [_.E3, null, null, null, _.G3, null, null, null, _.C4, null, null, null, _.E4, null, null, null],
+              // 静かな下降
+              [_.G4, null, null, _.E4, null, null, _.C4, null, null, _.G3, null, null, _.E3, null, null, null],
+              // 揺れ
+              [_.G3, null, null, _.C4, null, null, _.E4, null, _.C4, null, _.G3, null, _.C4, null, null, null],
             ], bpm:116, startDelay:12, vol:0.24 },
         ]},
       ]
