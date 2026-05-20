@@ -622,7 +622,7 @@ const PRESETS = {
               [132, null, 198, null, null],
               [null, 132, null, 198, null],
               [132, null, 165, null, null],
-              [null, 132, null, 176, null],
+              [null, 132, null, 220, null],
             ], bpm:15, startDelay:7, vol:0.36 },
           { type:'piano', name:'ソフトピアノ', icon:'🎹',
             patterns:[
@@ -663,7 +663,7 @@ const PRESETS = {
               [132, null, 198, null, null],
               [null, 132, null, 198, null],
               [132, null, 165, null, null],
-              [null, 132, null, 176, null],
+              [null, 132, null, 220, null],
             ], bpm:15, startDelay:7, vol:0.36 },
           { type:'piano', name:'ソフトピアノ', icon:'🎹',
             patterns:[
@@ -705,7 +705,7 @@ const PRESETS = {
               [132, null, 198, null, null],
               [null, 132, null, 198, null],
               [132, null, 165, null, null],
-              [null, 132, null, 176, null],
+              [null, 132, null, 220, null],
             ], bpm:10, startDelay:10, vol:0.26 },
           { type:'guitar',   name:'アコギアルペジオ',    icon:'🎸',
             patterns:[
@@ -2398,7 +2398,48 @@ class HealingApp {
   }
 
   _makeOcean() {
-    return this._makeFileLoop('ocean', true);
+    const ac       = this.ac;
+    const gainNode = ac.createGain();
+    gainNode.gain.value = 0;
+    gainNode.connect(this.dryBus);
+    gainNode.connect(this.reverbSend);
+
+    const nodes = [];
+    const buf   = this.soundBuffers['ocean'];
+    if (buf) {
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.loop   = true;
+
+      // ── 波の寄せ/引き — slow swell envelope ──────────────────────────────
+      // Real ocean swells: 8–18 s per cycle.  We pick 11–16 s at random so
+      // successive waves feel natural rather than metronomic.
+      const swellGain = ac.createGain();
+      swellGain.gain.value = 0.76;          // centre amplitude (LFO adds ±0.22)
+      // → actual range [0.54 … 0.98]: wave receding → wave breaking
+
+      const swellPeriod = 11 + Math.random() * 5;   // 11–16 s
+      const lfo         = ac.createOscillator();
+      lfo.type          = 'sine';
+      lfo.frequency.value = 1 / swellPeriod;
+
+      // Start LFO at a random phase so playback doesn't always begin at wave-peak
+      const phaseOffset = Math.random() * Math.PI * 2;
+      lfo.frequency.setValueAtTime(1 / swellPeriod, ac.currentTime);
+
+      const lfoDepth = ac.createGain();
+      lfoDepth.gain.value = 0.22;
+
+      lfo.connect(lfoDepth);
+      lfoDepth.connect(swellGain.gain);   // modulate the swell amplitude
+      lfo.start(ac.currentTime);
+
+      src.connect(swellGain);
+      swellGain.connect(gainNode);
+      src.start();
+      nodes.push(src, lfo);
+    }
+    return { gainNode, nodes };
   }
 
   _makeFire() {
@@ -2965,11 +3006,16 @@ class HealingApp {
         src.stop(this.ac.currentTime + dur + 0.5);
 
         if (addChords) {
-          // ── Harmonic chord voicing ────────────────────────────────────────
-          // All intervals are Just Intonation ratios → zero beating, maximum consonance.
+          // ── Harmonic chord voicing — C major triad filter ─────────────────
+          // Only add interval tones whose frequency lands on a C-major triad note
+          // (C, E, or G in any octave).  This prevents E→G# or G→B additions
+          // that would clash with the tonic drone layers.
+          // JI triad Hz: C2=66, E2=82.5, G2=99, C3=132, E3=165, G3=198,
+          //              C4=264, E4=330, G4=396, C5=528, E5=660, G5=792
+          const TRIAD  = [66, 82.5, 99, 132, 165, 198, 264, 330, 396, 528, 660, 792];
+          const isTriad = (hz) => TRIAD.some(t => Math.abs(hz / t - 1) < 0.006);
 
-          // Bass octave (freq/2): 55% chance when note is above G3 (198 Hz)
-          // Grounds the melody with a warm sub-tone without getting muddy in bass.
+          // Bass octave (freq/2): always a pure octave — 55% when above G3
           if (Math.random() < 0.55 && freq > 198) {
             const bassFreq = freq / 2;
             const bassBuf  = computePianoBuffer(this.ac, bassFreq, velocity * 0.30, dur * 1.3);
@@ -2983,38 +3029,32 @@ class HealingApp {
             bassS.stop(this.ac.currentTime + dur * 1.3 + 0.5);
           }
 
-          // Major 3rd (×5/4): 42% chance — the warmest, most emotionally resonant interval.
-          // In JI this is a pure 5:4 ratio, perfectly in tune with the overtone series.
-          if (Math.random() < 0.42) {
-            const thirdFreq = freq * 5 / 4;
-            if (thirdFreq < 660) {  // stay below E5 to avoid shrillness
-              const thirdBuf = computePianoBuffer(this.ac, thirdFreq, velocity * 0.24, dur * 0.88);
-              const thirdS   = this.ac.createBufferSource();
-              thirdS.buffer  = thirdBuf;
-              const thirdG   = this.ac.createGain();
-              thirdG.gain.value = velocity * 0.24;
-              thirdS.connect(thirdG);
-              thirdG.connect(destGain);
-              thirdS.start();
-              thirdS.stop(this.ac.currentTime + dur * 0.88 + 0.5);
-            }
+          // Major 3rd (×5/4): C→E ✓  E→G# ✗  G→B ✗ — filtered by isTriad
+          const thirdFreq = freq * 5 / 4;
+          if (Math.random() < 0.42 && isTriad(thirdFreq) && thirdFreq < 660) {
+            const thirdBuf = computePianoBuffer(this.ac, thirdFreq, velocity * 0.24, dur * 0.88);
+            const thirdS   = this.ac.createBufferSource();
+            thirdS.buffer  = thirdBuf;
+            const thirdG   = this.ac.createGain();
+            thirdG.gain.value = velocity * 0.24;
+            thirdS.connect(thirdG);
+            thirdG.connect(destGain);
+            thirdS.start();
+            thirdS.stop(this.ac.currentTime + dur * 0.88 + 0.5);
           }
 
-          // Perfect 5th (×3/2): 26% chance — open, pure, reinforces the overtone series.
-          // The 3:2 ratio is the most consonant interval after the octave.
-          if (Math.random() < 0.26) {
-            const fifthFreq = freq * 3 / 2;
-            if (fifthFreq < 660) {
-              const fifthBuf = computePianoBuffer(this.ac, fifthFreq, velocity * 0.17, dur * 0.82);
-              const fifthS   = this.ac.createBufferSource();
-              fifthS.buffer  = fifthBuf;
-              const fifthG   = this.ac.createGain();
-              fifthG.gain.value = velocity * 0.17;
-              fifthS.connect(fifthG);
-              fifthG.connect(destGain);
-              fifthS.start();
-              fifthS.stop(this.ac.currentTime + dur * 0.82 + 0.5);
-            }
+          // Perfect 5th (×3/2): C→G ✓  E→B ✗  G→D ✗ — filtered by isTriad
+          const fifthFreq = freq * 3 / 2;
+          if (Math.random() < 0.26 && isTriad(fifthFreq) && fifthFreq < 660) {
+            const fifthBuf = computePianoBuffer(this.ac, fifthFreq, velocity * 0.17, dur * 0.82);
+            const fifthS   = this.ac.createBufferSource();
+            fifthS.buffer  = fifthBuf;
+            const fifthG   = this.ac.createGain();
+            fifthG.gain.value = velocity * 0.17;
+            fifthS.connect(fifthG);
+            fifthG.connect(destGain);
+            fifthS.start();
+            fifthS.stop(this.ac.currentTime + dur * 0.82 + 0.5);
           }
         }
       }
