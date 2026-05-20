@@ -634,15 +634,15 @@ const PRESETS = {
           { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:28000, vol:0.36 },
           { type:'guitar',    name:'アコギアルペジオ',   icon:'🎸',
             patterns:[
-              [_.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3, _.C4],
-              [_.G3, _.C4, _.G3, _.E3, _.C3, _.E3, _.G3, _.C4],
-              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
+              [_.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.G3, _.C4],
+              [_.G3, _.C4, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4],
               [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
+              [_.G4, _.E4, _.C4, _.G3, _.C4, _.E4, _.G3, _.C4],
             ], bpm:77, startDelay:8, vol:0.28 },
           { type:'glock',     name:'鉄琴',         icon:'🎵',
             patterns:[
               [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
-              [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
+              [_.E4, null, _.C4, null, _.E4, null, _.C4, null],
               [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
               [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
             ], bpm:77, startDelay:16, vol:0.22 },
@@ -675,15 +675,15 @@ const PRESETS = {
           { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:28000, vol:0.36 },
           { type:'guitar',    name:'アコギアルペジオ',    icon:'🎸',
             patterns:[
-              [_.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3, _.C4],
-              [_.G3, _.C4, _.G3, _.E3, _.C3, _.E3, _.G3, _.C4],
-              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
+              [_.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.G3, _.C4],
+              [_.G3, _.C4, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4],
               [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
+              [_.G4, _.E4, _.C4, _.G3, _.C4, _.E4, _.G3, _.C4],
             ], bpm:77, startDelay:8, vol:0.28 },
           { type:'glock',     name:'鉄琴',          icon:'🎵',
             patterns:[
               [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
-              [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
+              [_.E4, null, _.C4, null, _.E4, null, _.C4, null],
               [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
               [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
             ], bpm:77, startDelay:16, vol:0.22 },
@@ -709,15 +709,15 @@ const PRESETS = {
             ], bpm:10, startDelay:10, vol:0.26 },
           { type:'guitar',   name:'アコギアルペジオ',    icon:'🎸',
             patterns:[
-              [_.E4, _.G4, _.E4, _.C4, _.G3, _.E3, _.G3, _.C4],
-              [_.G3, _.C4, _.G3, _.E3, _.C3, _.E3, _.G3, _.C4],
-              [_.E3, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4, _.G3],
+              [_.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.G3, _.C4],
+              [_.G3, _.C4, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4],
               [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
+              [_.G4, _.E4, _.C4, _.G3, _.C4, _.E4, _.G3, _.C4],
             ], bpm:77, startDelay:12, vol:0.24 },
           { type:'glock',    name:'鉄琴',           icon:'🎵',
             patterns:[
               [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
-              [_.E4, null, _.C4, null, _.E4, null, _.G3, null],
+              [_.E4, null, _.C4, null, _.E4, null, _.C4, null],
               [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
               [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
             ], bpm:77, startDelay:20, vol:0.20 },
@@ -2928,9 +2928,13 @@ class HealingApp {
         }
 
         // 12% chance of double-touch: play a harmony note 35–55 ms later
+        // Only allow intervals that land on C-major triad tones to avoid dissonance
         if (Math.random() < 0.12) {
-          const harmFreq = freq * (Math.random() < 0.6 ? 3/2 : 4/3); // 5th or 4th
-          if (harmFreq < this.ac.sampleRate * 0.45) {
+          const TRIAD = [66, 82.5, 99, 132, 165, 198, 264, 330, 396, 528, 660, 792];
+          const isTriad = (hz) => TRIAD.some(t => Math.abs(hz / t - 1) < 0.006);
+          const ratio = Math.random() < 0.6 ? 3/2 : 4/3; // perfect 5th or 4th
+          const harmFreq = freq * ratio;
+          if (harmFreq < this.ac.sampleRate * 0.45 && isTriad(harmFreq)) {
             const harmBuf = computeAdditiveBuffer(this.ac, harmFreq, 3.5);
             const harmS = this.ac.createBufferSource();
             harmS.buffer = harmBuf;
@@ -3127,7 +3131,7 @@ class HealingApp {
       const freq = curPat[noteIdx];
       if (freq) {
         const velocity = 0.30 + Math.random() * 0.34;
-        const dur      = 4.0 + Math.random() * 0.8;
+        const dur      = 2.5 + Math.random() * 0.6;
         const buf = computeGlockBuffer(this.ac, freq, velocity, dur);
         const src = this.ac.createBufferSource();
         src.buffer = buf;
@@ -3162,7 +3166,7 @@ class HealingApp {
       const freq = curPat[noteIdx];
       if (freq) {
         const velocity = 0.28 + Math.random() * 0.38;
-        const dur      = 2.4 + Math.random() * 0.8;
+        const dur      = 1.2 + Math.random() * 0.5;
         const buf = computeGuitarBuffer(this.ac, freq, velocity, dur);
         const src = this.ac.createBufferSource();
         src.buffer = buf;
