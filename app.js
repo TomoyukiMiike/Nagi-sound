@@ -3034,8 +3034,9 @@ class HealingApp {
           }
 
           // Major 3rd (×5/4): C→E ✓  E→G# ✗  G→B ✗ — filtered by isTriad
+          // Cap at G4=396 Hz — no chord note above G4 in healing/calm context
           const thirdFreq = freq * 5 / 4;
-          if (Math.random() < 0.42 && isTriad(thirdFreq) && thirdFreq < 660) {
+          if (Math.random() < 0.42 && isTriad(thirdFreq) && thirdFreq <= 396) {
             const thirdBuf = computePianoBuffer(this.ac, thirdFreq, velocity * 0.24, dur * 0.88);
             const thirdS   = this.ac.createBufferSource();
             thirdS.buffer  = thirdBuf;
@@ -3048,8 +3049,9 @@ class HealingApp {
           }
 
           // Perfect 5th (×3/2): C→G ✓  E→B ✗  G→D ✗ — filtered by isTriad
+          // Cap at G4=396 Hz — no chord note above G4 in healing/calm context
           const fifthFreq = freq * 3 / 2;
-          if (Math.random() < 0.26 && isTriad(fifthFreq) && fifthFreq < 660) {
+          if (Math.random() < 0.26 && isTriad(fifthFreq) && fifthFreq <= 396) {
             const fifthBuf = computePianoBuffer(this.ac, fifthFreq, velocity * 0.17, dur * 0.82);
             const fifthS   = this.ac.createBufferSource();
             fifthS.buffer  = fifthBuf;
@@ -3849,6 +3851,13 @@ class HealingApp {
     if (weather === 'clear') bpm = Math.round(bpm * 1.10);
     if (weather === 'rainy') bpm = Math.max(3, Math.round(bpm * 0.85));
 
+    // ── Calm-category constraints ────────────────────────────────────────────
+    // Relaxation / sleep categories need slower tempo, narrower range, and fewer notes.
+    // Goal: ambient texture that calms, not a melody that engages attention.
+    const calmCats = new Set(['relax','meditation','presleep','sleep']);
+    const isCalm = calmCats.has(cat);
+    if (isCalm) bpm = Math.min(bpm, 7);  // never faster than 7 bpm for calm contexts
+
     // ── Pure C-major pentatonic (C D E G A) across 3 octaves ──
     // F and B are excluded — they create minor-2nd clashes with sustained piano decay
     const PENTA = [
@@ -3858,10 +3867,12 @@ class HealingApp {
     ];
 
     // ── Category: usable note pools (pure pentatonic) ──
+    // Calm categories (relax / meditation / presleep / sleep) are capped at C5=528Hz
+    // — the solfeggio root — so no note ever sounds "jarringly high" during rest.
     const pools = {
       morning:    { low:[_.C3,_.E3,_.G3],      mid:[_.C4,_.E4,_.G4,_.A4],  high:[_.C5,_.E5,_.G5]  },
-      relax:      { low:[_.C3,_.G3,_.A3],       mid:[_.C4,_.G4,_.A4],       high:[_.C5,_.A5]        },
-      meditation: { low:[_.C3,_.G3,_.A3],       mid:[_.C4,_.E4,_.G4,_.A4],  high:[_.C5,_.E5,_.A5]  },
+      relax:      { low:[_.C3,_.G3,_.A3],       mid:[_.C4,_.G4,_.A4],       high:[_.C5]             },
+      meditation: { low:[_.C3,_.G3,_.A3],       mid:[_.C4,_.E4,_.G4,_.A4],  high:[_.C5]             },
       focus:      { low:[_.C3,_.E3,_.G3],       mid:[_.C4,_.E4,_.G4],       high:[_.C5,_.E5,_.G5]  },
       presleep:   { low:[_.C3,_.G3,_.A3],       mid:[_.C4,_.G4,_.A4],       high:[_.C5]             },
       sleep:      { low:[_.C3,_.G3],            mid:[_.C4,_.E4,_.G4],       high:[_.C5]             },
@@ -3872,19 +3883,24 @@ class HealingApp {
     let rMin = 0, rMax = PENTA_FILTERED.length - 1;
 
     // Time: predawn/night pull lower; morning pulls higher
-    const segShift = [-2, 1, 0, -1, -2][seg];
+    // For calm categories, suppress the upward shift so the register stays low
+    const segShift = isCalm ? [-2, 0, 0, -1, -2][seg] : [-2, 1, 0, -1, -2][seg];
     rMin = Math.max(0,            rMin + segShift);
     rMax = Math.min(PENTA_FILTERED.length - 1, rMax + segShift);
 
     // Weather: clear → up 1 step, rainy → down 1 step
-    const wShift = weather === 'clear' ? 1 : weather === 'rainy' ? -1 : 0;
+    // For calm categories, halve the upward push so sunny weather doesn't push too high
+    const wShift = weather === 'clear' ? (isCalm ? 0 : 1) : weather === 'rainy' ? -1 : 0;
     rMin = Math.max(0,            rMin + wShift);
     rMax = Math.min(PENTA_FILTERED.length - 1, rMax + wShift);
     if (rMin >= rMax) rMax = Math.min(PENTA_FILTERED.length - 1, rMin + 3);
 
     // ── Density ──
     const baseDensity = [0.25, 0.50, 0.45, 0.38, 0.22][seg];
-    const density = Math.min(0.65, baseDensity * (weather === 'rainy' ? 0.80 : weather === 'clear' ? 1.05 : 1.0));
+    // Calm categories: 20% sparser — more silence, more breath between notes
+    const density = Math.min(0.65, baseDensity
+      * (weather === 'rainy' ? 0.80 : weather === 'clear' ? 1.05 : 1.0)
+      * (isCalm ? 0.80 : 1.0));
 
     // ── Seeded RNG ──
     const catIdx = ['morning','relax','meditation','focus','presleep','sleep','walk'].indexOf(cat);
@@ -3905,11 +3921,19 @@ class HealingApp {
       // Choose shape for this 8-beat pattern
       const shapeR = rng();
       // ascend / descend / arch(up then down) / valley(down then up) / meander
-      const shape = shapeR < 0.22 ? 'ascend'
-                  : shapeR < 0.44 ? 'descend'
-                  : shapeR < 0.62 ? 'arch'
-                  : shapeR < 0.80 ? 'valley'
-                  : 'meander';
+      // Calm categories: strongly prefer descend / valley / meander (settling shapes)
+      // and almost never use pure ascend (which creates tension and expectation).
+      const shape = isCalm
+        ? (shapeR < 0.08 ? 'ascend'    //  8% — very rarely climb
+         : shapeR < 0.36 ? 'descend'   // 28% — prefer downward (settling)
+         : shapeR < 0.54 ? 'arch'      // 18% — peak then resolve
+         : shapeR < 0.78 ? 'valley'    // 24% — cradle motion (down, then soft rise)
+         : 'meander')                  // 22% — gentle wandering
+        : (shapeR < 0.22 ? 'ascend'
+         : shapeR < 0.44 ? 'descend'
+         : shapeR < 0.62 ? 'arch'
+         : shapeR < 0.80 ? 'valley'
+         : 'meander');
 
       const pat = [];
       for (let n = 0; n < 8; n++) {
@@ -3924,8 +3948,9 @@ class HealingApp {
           case 'valley':  delta = n < 4 ? (rng() < 0.65 ? -1 : 0) : (rng() < 0.65 ? 1 : 0); break;
           default:        delta = Math.round((rng() - 0.5) * 2); break;  // −1, 0, +1
         }
-        // Occasionally a ±2 leap (still within pentatonic = consonant skip-3rd)
-        if (rng() < 0.18) delta *= 2;
+        // Occasionally a ±2 leap (pentatonic = consonant skip-3rd)
+        // Calm categories: halve leap frequency to keep motion smooth and unhurried
+        if (rng() < (isCalm ? 0.08 : 0.18)) delta *= 2;
 
         pos = Math.max(rMin, Math.min(rMax, pos + delta));
         pat.push(PENTA_FILTERED[pos]);
