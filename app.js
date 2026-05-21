@@ -5318,53 +5318,104 @@ function computeSnareBuffer(ac) {
   return buf;
 }
 
-// ── Melodic synthesis ───────────────────────────────────────────────────────
+// ── Instrument synthesis ────────────────────────────────────────────────────
+//  Three real instruments: acoustic guitar, bass guitar, piano.
+//  Guitar + bass use Karplus-Strong plucked-string synthesis (physically based).
+//  Piano chord comping uses a fast 4-partial model; melody uses the full
+//  computePianoBuffer defined at the top of this file.
 
-// FM bass — correct modulation index (2.8 at onset, decays to ~0)
-// IMPORTANT: modIdx must be a small number (1-3), NOT freq * constant
-function computeFMBassBuffer(ac, freq, dur = 0.72) {
-  const sr = ac.sampleRate;
-  const len = Math.round(sr * dur);
+// Acoustic guitar — Karplus-Strong plucked string
+// Front-loaded pick burst → bright attack that decays into warm resonance.
+function computePickGuitar(ac, freq, dur = 2.8) {
+  const sr  = ac.sampleRate;
+  const N   = Math.max(2, Math.round(sr / freq));   // delay line = one pitch period
+  const len = Math.min(Math.round(sr * dur), sr * 4);
   const buf = ac.createBuffer(1, len, sr);
-  const d = buf.getChannelData(0);
-  let carPh = 0, modPh = 0;
-  const carInc = 2 * Math.PI * freq / sr;
-  const modInc = 2 * Math.PI * freq / sr;  // 1:1 ratio
-  for (let i = 0; i < len; i++) {
-    const t = i / sr;
-    const modIdx = 2.8 * Math.exp(-5.5 * t);          // 2.8 → ~0 (bright → warm)
-    const att    = t < 0.006 ? t / 0.006 : 1.0;       // 6 ms attack
-    const env    = att * Math.exp(-1.6 * t);
-    d[i] = env * Math.sin(carPh + modIdx * Math.sin(modPh));
-    carPh += carInc; if (carPh > 6.2832) carPh -= 6.2832;
-    modPh += modInc; if (modPh > 6.2832) modPh -= 6.2832;
+  const d   = buf.getChannelData(0);
+
+  // Initial pluck: front-loaded noise burst (stronger at pick point)
+  const ring = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const t = i / N;
+    ring[i] = (Math.random() * 2 - 1) * (0.25 + 0.75 * Math.exp(-3.5 * t));
   }
+
+  // Karplus-Strong two-point average feedback
+  // g = 0.498: gain per period ≈ 0.996 → bright guitar decay ~1–3 s
+  const g = 0.498;
+  let ptr = 0;
+  for (let i = 0; i < len; i++) {
+    const pp = (ptr + N - 1) % N;
+    const y  = g * (ring[ptr] + ring[pp]);
+    ring[ptr] = y;
+    d[i]      = y;
+    ptr = (ptr + 1) % N;
+  }
+
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0) for (let i = 0; i < len; i++) d[i] /= pk * 1.10;
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] /= pk * 1.1;
   return buf;
 }
 
-// FM Rhodes — correct modulation index (1.8 at onset, sustains at ~0.18)
-// Models DX7 electric piano algorithm: carrier + decaying FM modulator
-function computeRhodesBuffer(ac, freq, dur = 2.2) {
-  const sr = ac.sampleRate;
+// Bass guitar — Karplus-Strong, warm initial spectrum, longer sustain
+function computePickBass(ac, freq, dur = 2.0) {
+  const sr  = ac.sampleRate;
+  const N   = Math.max(2, Math.round(sr / freq));
+  const len = Math.min(Math.round(sr * dur), sr * 3);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+
+  // Warm pluck: low-pass the initial noise to reduce high-frequency bite
+  const ring = new Float32Array(N);
+  for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
+  let lp = 0;
+  for (let i = 0; i < N; i++) { lp += 0.22 * (ring[i] - lp); ring[i] = lp; }
+  let pk0 = 0; for (const v of ring) pk0 = Math.max(pk0, Math.abs(v));
+  if (pk0 > 0) for (let i = 0; i < N; i++) ring[i] /= pk0;
+
+  // Slightly less damping than guitar → longer sustain for bass
+  const g = 0.499;
+  let ptr = 0;
+  for (let i = 0; i < len; i++) {
+    const pp = (ptr + N - 1) % N;
+    const y  = g * (ring[ptr] + ring[pp]);
+    ring[ptr] = y;
+    d[i]      = y;
+    ptr = (ptr + 1) % N;
+  }
+
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] /= pk * 1.1;
+  return buf;
+}
+
+// Piano chord note — fast 4-partial synthesis for pre-rendered chord comping.
+// (Full computePianoBuffer is used for melody, computed on-the-fly.)
+function computePianoChordNote(ac, freq, dur = 1.8) {
+  const sr  = ac.sampleRate;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
-  const d = buf.getChannelData(0);
-  let carPh = 0, modPh = 0;
-  const carInc = 2 * Math.PI * freq / sr;
-  const modInc = 2 * Math.PI * freq / sr;  // 1:1
+  const d   = buf.getChannelData(0);
+  const ph  = Math.random() * Math.PI * 2;
+  const fDet = freq * 1.0012;                  // +2 cents detuned unison string
+
   for (let i = 0; i < len; i++) {
-    const t = i / sr;
-    const modIdx = 1.8 * Math.exp(-2.5 * t) + 0.18;  // sustains at 0.18 for warmth
-    const att    = t < 0.010 ? t / 0.010 : 1.0;       // 10 ms attack
-    const env    = att * (0.12 * Math.exp(-5 * t) + 0.88 * Math.exp(-0.22 * t));
-    d[i] = env * Math.sin(carPh + modIdx * Math.sin(modPh));
-    carPh += carInc; if (carPh > 6.2832) carPh -= 6.2832;
-    modPh += modInc; if (modPh > 6.2832) modPh -= 6.2832;
+    const t   = i / sr;
+    const att = t < 0.004 ? t / 0.004 : 1.0;  // 4 ms hammer attack
+    let s = 0;
+    s += 0.62 * Math.exp(-0.45 * t) * Math.sin(2 * Math.PI * freq       * t + ph);
+    s += 0.22 * Math.exp(-1.10 * t) * Math.sin(2 * Math.PI * freq * 2   * t + ph * 1.3);
+    s += 0.09 * Math.exp(-2.40 * t) * Math.sin(2 * Math.PI * freq * 3   * t + ph * 2.1);
+    s += 0.04 * Math.exp(-4.80 * t) * Math.sin(2 * Math.PI * freq * 4   * t + ph * 3.5);
+    s += 0.16 * Math.exp(-0.50 * t) * Math.sin(2 * Math.PI * fDet       * t + ph * 0.9);
+    // Hammer knock transient
+    if (i < Math.round(sr * 0.014))
+      s += (Math.random() * 2 - 1) * 0.07 * Math.exp(-i / (sr * 0.003));
+    d[i] = s * att;
   }
+
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0) for (let i = 0; i < len; i++) d[i] /= pk * 1.10;
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.78;
   return buf;
 }
 
@@ -5423,67 +5474,115 @@ const BASS_LINES = {
   Dm7:   [1,0,0,0, 0,0,0,0, 1,0,0,0, 1.5,0,0,0],
 };
 
+// ── Procedural variation data ────────────────────────────────────────────────
+
+// Multiple chord progressions per situation — one is chosen randomly each session
+const PROG_VARIANTS = {
+  morning:   [
+    ['Cmaj7','Am7','Fmaj7','G7'],
+    ['Cmaj7','G7','Am7','Fmaj7'],
+    ['Fmaj7','Cmaj7','Am7','G7'],
+  ],
+  relax:     [
+    ['Cmaj7','Fmaj7','Am7','G7'],
+    ['Am7','Fmaj7','Cmaj7','G7'],
+    ['Fmaj7','Am7','G7','Cmaj7'],
+  ],
+  walk:      [
+    ['C','G','Am','F'],
+    ['C','Am','F','G'],
+    ['F','C','G','Am'],
+  ],
+  focus:     [
+    ['Am7','G7','Fmaj7','Cmaj7'],
+    ['Am7','Fmaj7','G7','Cmaj7'],
+    ['Fmaj7','G7','Am7','Cmaj7'],
+  ],
+  meditation:[
+    ['Cmaj7','Fmaj7'],
+    ['Am7','Fmaj7'],
+    ['Fmaj7','Cmaj7'],
+  ],
+  night:     [
+    ['Am7','Fmaj7','Cmaj7','G7'],
+    ['Am7','G7','Fmaj7','Cmaj7'],
+    ['Fmaj7','Cmaj7','Am7','G7'],
+  ],
+};
+
+// 8 fingerpicking patterns (indices into chord.pads array)
+const GUITAR_ARP_STYLES = [
+  [0,1,2,3,2,1,0,1],  // ascending → descending
+  [3,2,1,0,1,2,3,2],  // descending → ascending
+  [0,2,1,3,0,2,1,3],  // alternating
+  [0,3,0,2,0,1,0,2],  // bass-treble thumb pattern
+  [0,2,3,1,0,2,3,1],  // mixed
+  [0,1,3,2,1,3,0,2],  // arc leaps
+  [2,0,3,1,2,0,1,3],  // offset start
+  [0,2,0,3,0,1,0,3],  // pedal bass
+];
+
 // 6 situation tracks — tabs match the healing mode categories
 const MUSIC_TRACKS = [
   {
     id: 'morning', name: '朝', icon: '🌅',
     sub: 'コーヒーと朝の光の中で',
-    bpm: 87, drumPat: 'boomBap', barsPerChord: 4,
-    prog: ['Cmaj7','Am7','Fmaj7','G7'],
-    rhodesSteps: [2, 10],   // "and-of-1" / "and-of-3" offbeat comping
-    rhodesNotes: 3,
+    bpmRange: [84,90], drumPat: 'boomBap', barsPerChord: 4,
+    pianoSteps: [2, 10],   // offbeat comping
+    pianoNotes: 3,
+    guitarDensity: 0.78,
     melodChance: 0.30,
-    vol: { k:0.54, s:0.40, h:0.20, bass:0.58, rhodes:0.34, melo:0.20, pad:0.06 },
+    vol: { k:0.54, s:0.40, h:0.20, bass:0.58, piano:0.32, guitar:0.38, melo:0.20, pad:0.06 },
   },
   {
     id: 'relax', name: 'リラックス', icon: '🌿',
     sub: '深呼吸して、ゆっくりと',
-    bpm: 72, drumPat: 'minimal', barsPerChord: 8,
-    prog: ['Cmaj7','Fmaj7','Am7','G7'],
-    rhodesSteps: [0, 8],    // on the beat, long sustain
-    rhodesNotes: 4,
+    bpmRange: [68,76], drumPat: 'minimal', barsPerChord: 8,
+    pianoSteps: [0, 8],
+    pianoNotes: 4,
+    guitarDensity: 0.50,
     melodChance: 0.20,
-    vol: { k:0.26, s:0.18, h:0.10, bass:0.50, rhodes:0.42, melo:0.18, pad:0.09 },
+    vol: { k:0.26, s:0.18, h:0.10, bass:0.50, piano:0.38, guitar:0.30, melo:0.18, pad:0.09 },
   },
   {
     id: 'walk', name: '散歩', icon: '🚶',
     sub: '街を歩きながら',
-    bpm: 96, drumPat: 'fourFloor', barsPerChord: 4,
-    prog: ['C','G','Am','F'],
-    rhodesSteps: [2, 6, 10, 14],  // every beat-and, staccato stabs
-    rhodesNotes: 2,
+    bpmRange: [92,100], drumPat: 'fourFloor', barsPerChord: 4,
+    pianoSteps: [2, 6, 10, 14],
+    pianoNotes: 2,
+    guitarDensity: 0.88,
     melodChance: 0.38,
-    vol: { k:0.60, s:0.46, h:0.24, bass:0.56, rhodes:0.28, melo:0.22, pad:0.05 },
+    vol: { k:0.60, s:0.46, h:0.24, bass:0.56, piano:0.26, guitar:0.44, melo:0.22, pad:0.05 },
   },
   {
     id: 'focus', name: '集中', icon: '✨',
     sub: '作業に没頭する時間',
-    bpm: 84, drumPat: 'steadyHat', barsPerChord: 4,
-    prog: ['Am7','G7','Fmaj7','Cmaj7'],
-    rhodesSteps: [0, 8],
-    rhodesNotes: 3,
-    melodChance: 0.14,   // very sparse melody — don't distract
-    vol: { k:0.46, s:0.32, h:0.18, bass:0.54, rhodes:0.34, melo:0.14, pad:0.07 },
+    bpmRange: [80,88], drumPat: 'steadyHat', barsPerChord: 4,
+    pianoSteps: [0, 8],
+    pianoNotes: 3,
+    guitarDensity: 0.42,
+    melodChance: 0.14,
+    vol: { k:0.46, s:0.32, h:0.18, bass:0.54, piano:0.30, guitar:0.26, melo:0.14, pad:0.07 },
   },
   {
     id: 'meditation', name: '瞑想', icon: '🌸',
     sub: '静かに、ただ存在する',
-    bpm: 60, drumPat: 'ambient', barsPerChord: 8,
-    prog: ['Cmaj7','Fmaj7'],
-    rhodesSteps: [0],    // single hit per bar, long decay
-    rhodesNotes: 4,
+    bpmRange: [56,64], drumPat: 'ambient', barsPerChord: 8,
+    pianoSteps: [0],
+    pianoNotes: 4,
+    guitarDensity: 0.28,
     melodChance: 0.08,
-    vol: { k:0.0, s:0.0, h:0.0, bass:0.40, rhodes:0.46, melo:0.14, pad:0.12 },
+    vol: { k:0.0, s:0.0, h:0.0, bass:0.40, piano:0.42, guitar:0.20, melo:0.14, pad:0.12 },
   },
   {
     id: 'night', name: '夜', icon: '🌙',
     sub: '夜、窓の外を眺めながら',
-    bpm: 68, drumPat: 'minimal', barsPerChord: 8,
-    prog: ['Am7','Fmaj7','Cmaj7','G7'],
-    rhodesSteps: [0, 8],
-    rhodesNotes: 4,
+    bpmRange: [64,72], drumPat: 'minimal', barsPerChord: 8,
+    pianoSteps: [0, 8],
+    pianoNotes: 4,
+    guitarDensity: 0.38,
     melodChance: 0.16,
-    vol: { k:0.22, s:0.14, h:0.08, bass:0.46, rhodes:0.44, melo:0.16, pad:0.09 },
+    vol: { k:0.22, s:0.14, h:0.08, bass:0.46, piano:0.40, guitar:0.24, melo:0.16, pad:0.09 },
   },
 ];
 
@@ -5507,12 +5606,18 @@ class NagiMusic {
     this._hatBuf   = null;
     this._ohatBuf  = null;
 
-    // Note buffer caches (pre-rendered per frequency)
-    this._bassBufs   = new Map();  // freq → AudioBuffer
-    this._rhodesBufs = new Map();  // freq → AudioBuffer
+    // Instrument buffer caches (pre-rendered per frequency)
+    this._bassBufs   = new Map();  // freq → AudioBuffer (Karplus-Strong bass)
+    this._guitarBufs = new Map();  // freq → AudioBuffer (Karplus-Strong guitar)
+    this._pianoBufs  = new Map();  // freq → AudioBuffer (additive piano chord note)
 
     // Sustaining sine pad (oscillator nodes, one per chord tone)
     this._padNodes = [];           // [{osc, gain}]
+
+    // Per-session procedural state — regenerated each time a track starts
+    this._sessionProg      = null; // chord progression for this session
+    this._sessionBpm       = 80;
+    this._sessionGuitarArp = null; // fingerpicking pattern index array
 
     // Melody continuity
     this._lastMeloFreq = null;
@@ -5558,7 +5663,7 @@ class NagiMusic {
     }
   }
 
-  // Select a track by index — called by tab clicks or auto-transition
+  // Select a track by index — called by tab clicks
   selectTrack(idx) {
     if (idx === this.trackIdx) return;
     if (this._transitioning) return;
@@ -5571,11 +5676,13 @@ class NagiMusic {
     this.trackGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.25);
 
     setTimeout(() => {
-      this.trackIdx      = idx;
-      this._step         = 0;
-      this._bar          = 0;
-      this._lastMeloFreq = null;
+      this.trackIdx = idx;
+      this._step    = 0;
+      this._bar     = 0;
       this._transitioning = false;
+
+      // Generate a fresh procedural session for the new track
+      this._generateSession();
 
       this._stopPad();
       this._startPad();
@@ -5591,6 +5698,18 @@ class NagiMusic {
   setVol(v) {
     if (this.masterGain && this.ac)
       this.masterGain.gain.setTargetAtTime(v, this.ac.currentTime, 0.1);
+  }
+
+  // ── Procedural session generator ─────────────────────────────────────────────
+  // Called once per track start — randomises progression, BPM, guitar arp style
+  _generateSession() {
+    const track    = MUSIC_TRACKS[this.trackIdx];
+    const variants = PROG_VARIANTS[track.id] || [['Cmaj7']];
+    this._sessionProg      = variants[Math.floor(Math.random() * variants.length)];
+    const [lo, hi]         = track.bpmRange;
+    this._sessionBpm       = lo + Math.floor(Math.random() * (hi - lo + 1));
+    this._sessionGuitarArp = GUITAR_ARP_STYLES[Math.floor(Math.random() * GUITAR_ARP_STYLES.length)];
+    this._lastMeloFreq     = null;
   }
 
   // ── Audio engine ────────────────────────────────────────────────────────────
@@ -5634,6 +5753,9 @@ class NagiMusic {
     this._ohatBuf  = computeHihatBuffer(this.ac, true);
     this._prerenderNotes();
 
+    // Generate initial session
+    this._generateSession();
+
     // Fade in
     const vol = (+document.getElementById('ms-vol').value) / 100;
     this.masterGain.gain.setTargetAtTime(vol, this.ac.currentTime, 1.2);
@@ -5644,29 +5766,36 @@ class NagiMusic {
     // Launch lookahead scheduler
     this.isPlaying = true;
     this._step = this._bar = 0;
-    this._lastMeloFreq = null;
     this._nextStepTime = this.ac.currentTime + 0.10;
     this._scheduler();
   }
 
-  // Pre-render all bass and Rhodes buffers used across every track
+  // Pre-render all instrument buffers used across every track + every variant
   _prerenderNotes() {
     const bassFreqs   = new Set();
-    const rhodesFreqs = new Set();
+    const guitarFreqs = new Set();
+    const pianoFreqs  = new Set();
 
     MUSIC_TRACKS.forEach(t => {
-      t.prog.forEach(chName => {
-        const ch = MCHORDS[chName];
-        // Bass: root + fifth
-        bassFreqs.add(ch.bass);
-        bassFreqs.add(+(ch.bass * 1.5).toFixed(2));
-        // Rhodes: all pad tones
-        ch.pads.forEach(f => rhodesFreqs.add(f));
+      (PROG_VARIANTS[t.id] || []).forEach(prog => {
+        prog.forEach(chName => {
+          const ch = MCHORDS[chName];
+          if (!ch) return;
+          // Bass: root + fifth walk
+          bassFreqs.add(ch.bass);
+          bassFreqs.add(+(ch.bass * 1.5).toFixed(2));
+          // Guitar: all pad tones (fingerpicked)
+          ch.pads.forEach(f => guitarFreqs.add(f));
+          // Piano: all pad tones (chord comping) + melody pool
+          ch.pads.forEach(f => pianoFreqs.add(f));
+          ch.melo.forEach(f => pianoFreqs.add(f));
+        });
       });
     });
 
-    bassFreqs.forEach(f   => this._bassBufs.set(f,   computeFMBassBuffer(this.ac, f)));
-    rhodesFreqs.forEach(f => this._rhodesBufs.set(f, computeRhodesBuffer(this.ac, f)));
+    bassFreqs.forEach(f   => this._bassBufs.set(f,   computePickBass(this.ac, f)));
+    guitarFreqs.forEach(f => this._guitarBufs.set(f, computePickGuitar(this.ac, f)));
+    pianoFreqs.forEach(f  => this._pianoBufs.set(f,  computePianoChordNote(this.ac, f)));
   }
 
   _getBassBuffer(freq) {
@@ -5676,21 +5805,32 @@ class NagiMusic {
       if (d < bestDiff) { bestDiff = d; best = buf; }
     }
     if (bestDiff < 4) return best;
-    // Fallback: compute on-the-fly and cache
-    const buf = computeFMBassBuffer(this.ac, freq);
+    const buf = computePickBass(this.ac, freq);
     this._bassBufs.set(freq, buf);
     return buf;
   }
 
-  _getRhodesBuffer(freq) {
+  _getGuitarBuffer(freq) {
     let best = null, bestDiff = Infinity;
-    for (const [f, buf] of this._rhodesBufs) {
+    for (const [f, buf] of this._guitarBufs) {
       const d = Math.abs(f - freq);
       if (d < bestDiff) { bestDiff = d; best = buf; }
     }
     if (bestDiff < 4) return best;
-    const buf = computeRhodesBuffer(this.ac, freq);
-    this._rhodesBufs.set(freq, buf);
+    const buf = computePickGuitar(this.ac, freq);
+    this._guitarBufs.set(freq, buf);
+    return buf;
+  }
+
+  _getPianoBuffer(freq) {
+    let best = null, bestDiff = Infinity;
+    for (const [f, buf] of this._pianoBufs) {
+      const d = Math.abs(f - freq);
+      if (d < bestDiff) { bestDiff = d; best = buf; }
+    }
+    if (bestDiff < 4) return best;
+    const buf = computePianoChordNote(this.ac, freq);
+    this._pianoBufs.set(freq, buf);
     return buf;
   }
 
@@ -5698,7 +5838,8 @@ class NagiMusic {
 
   _startPad() {
     const track = MUSIC_TRACKS[this.trackIdx];
-    const chord = MCHORDS[track.prog[0]];
+    const prog  = this._sessionProg || PROG_VARIANTS[track.id][0];
+    const chord = MCHORDS[prog[0]];
     // Two sine oscillators: bottom two pad tones, very soft
     const freqs = chord.pads.slice(0, 2);
     this._padNodes = freqs.map((freq, i) => {
@@ -5737,14 +5878,12 @@ class NagiMusic {
 
   // ── Lookahead scheduler (Chris Wilson pattern) ───────────────────────────────
   //  Runs every 50 ms; schedules any steps that fall within the next 150 ms.
-  //  This gives sample-accurate timing with zero drift — the AudioContext clock
-  //  drives all note start times, not setTimeout intervals.
+  //  The AudioContext clock drives all note start times — zero drift.
 
   _scheduler() {
     if (!this.isPlaying || !this.ac) return;
     const LOOKAHEAD = 0.15;  // 150 ms window
-    const track    = MUSIC_TRACKS[this.trackIdx];
-    const stepDur  = 60.0 / track.bpm / 4.0;  // 16th-note duration in seconds
+    const stepDur   = 60.0 / this._sessionBpm / 4.0;  // 16th-note duration
 
     while (this._nextStepTime < this.ac.currentTime + LOOKAHEAD) {
       this._scheduleStep(this._nextStepTime);
@@ -5760,10 +5899,11 @@ class NagiMusic {
     const track    = MUSIC_TRACKS[this.trackIdx];
     const drum     = DRUM_PATTERNS[track.drumPat];
     const si       = this._step;
-    const cycleLen = track.barsPerChord * track.prog.length;
+    const prog     = this._sessionProg;
+    const cycleLen = track.barsPerChord * prog.length;
     const barInCy  = this._bar % cycleLen;
-    const chordIdx = Math.floor(barInCy / track.barsPerChord) % track.prog.length;
-    const chName   = track.prog[chordIdx];
+    const chordIdx = Math.floor(barInCy / track.barsPerChord) % prog.length;
+    const chName   = prog[chordIdx];
     const chord    = MCHORDS[chName];
 
     // ── Drums ────────────────────────────────────────────────────────────────
@@ -5775,9 +5915,9 @@ class NagiMusic {
                when, track.vol.h * (0.55 + Math.random() * 0.45));
     }
 
-    // ── Bass (from BASS_LINES pattern) ──────────────────────────────────────
+    // ── Bass (Karplus-Strong, from BASS_LINES pattern) ────────────────────────
     const bassLine = BASS_LINES[chName] || BASS_LINES['C'];
-    if (bassLine[si]) {
+    if (bassLine && bassLine[si]) {
       const bassFreq = chord.bass * bassLine[si];
       this._pb(this._getBassBuffer(bassFreq), when, track.vol.bass);
     }
@@ -5787,23 +5927,39 @@ class NagiMusic {
       this._updatePad(chord, track.vol.pad, when);
     }
 
-    // ── Rhodes comping ───────────────────────────────────────────────────────
-    if (track.rhodesSteps.includes(si)) {
-      // Inner voicing: skip lowest pad note to avoid muddiness
+    // ── Acoustic guitar fingerpicking (Karplus-Strong) ────────────────────────
+    // Fires every two 16th-notes (8th-note grid), with humanising jitter
+    if (si % 2 === 0) {
+      const arpStep = (si / 2) % this._sessionGuitarArp.length;
+      const noteIdx = this._sessionGuitarArp[arpStep];
+      const freq    = chord.pads[Math.min(noteIdx, chord.pads.length - 1)];
+      if (Math.random() < track.guitarDensity) {
+        const jitter = (Math.random() - 0.5) * 0.012;
+        this._pb(
+          this._getGuitarBuffer(freq),
+          Math.max(when, when + jitter),
+          track.vol.guitar * (0.70 + Math.random() * 0.30)
+        );
+      }
+    }
+
+    // ── Piano chord comping (additive synthesis) ──────────────────────────────
+    if (track.pianoSteps.includes(si)) {
       const pads    = chord.pads;
       const start   = pads.length >= 4 ? 1 : 0;
-      const voicing = pads.slice(start, start + track.rhodesNotes);
+      const voicing = pads.slice(start, start + track.pianoNotes);
       voicing.forEach((freq, i) => {
-        const buf = this._getRhodesBuffer(freq);
-        this._pb(buf, when + i * 0.012,
-                 track.vol.rhodes * (i === 0 ? 1.0 : 0.72));
+        this._pb(
+          this._getPianoBuffer(freq),
+          when + i * 0.014,
+          track.vol.piano * (i === 0 ? 1.0 : 0.72)
+        );
       });
     }
 
     // ── Melody (piano, sparse, stepwise random-walk) ─────────────────────────
     if (si % 4 === 0 && Math.random() < track.melodChance) {
       const freq = this._nextMeloNote(chord);
-      // computePianoBuffer is a module-level function defined in the healing section
       const buf  = computePianoBuffer(this.ac, freq, track.vol.melo * 0.55, 1.6);
       this._pb(buf, when, 1.0);
     }
@@ -5815,7 +5971,8 @@ class NagiMusic {
       this._bar++;
       // Update progress bar — shows position in current chord cycle
       const track    = MUSIC_TRACKS[this.trackIdx];
-      const cycleLen = track.barsPerChord * track.prog.length;
+      const prog     = this._sessionProg;
+      const cycleLen = track.barsPerChord * prog.length;
       const pct      = (this._bar % cycleLen) / cycleLen * 100;
       const fill     = document.getElementById('ms-progress-fill');
       if (fill) fill.style.width = pct + '%';
@@ -5829,7 +5986,6 @@ class NagiMusic {
       this._lastMeloFreq = pool[Math.floor(pool.length / 2)];
       return this._lastMeloFreq;
     }
-    // Collect "close" notes (ratio within ~1.14 = minor second/third range)
     const close = pool.filter(f => {
       const r = f / this._lastMeloFreq;
       return r > 0.87 && r < 1.15;
@@ -5870,7 +6026,6 @@ class NagiMusic {
     if (name) name.textContent = t.name;
     if (sub)  sub.textContent  = t.sub;
     if (fill) { fill.style.transition = 'none'; fill.style.width = '0%'; }
-    // Sync active tab
     document.querySelectorAll('.ms-track-tab').forEach((btn, i) => {
       btn.classList.toggle('active', i === this.trackIdx);
     });
@@ -5898,8 +6053,8 @@ class NagiMusic {
   _startVis() {
     const canvas = document.getElementById('ms-canvas');
     if (!canvas) return;
-    const ctx  = canvas.getContext('2d');
-    const bars = 52;
+    const ctx    = canvas.getContext('2d');
+    const bars   = 52;
     const smooth = new Float32Array(bars).fill(0);
 
     const draw = () => {
