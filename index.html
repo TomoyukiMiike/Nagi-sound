@@ -131,6 +131,40 @@
     <p class="hp-tip">🎧 ヘッドフォン推奨 — バイノーラルビートは両耳で体験できます</p>
 
   </div>
+
+  <!-- ── 凪 Music ────────────────────────────────────────────────────────── -->
+  <div id="music-screen">
+    <div class="ms-topbar">
+      <button class="ms-back-btn" id="ms-back-btn" aria-label="ヒーリングに戻る">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M14 5L8 11l6 6" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <span class="ms-brand">凪 Music</span>
+      <button class="ms-skip-btn" id="ms-skip-btn">次へ →</button>
+    </div>
+
+    <canvas id="ms-canvas" class="ms-canvas"></canvas>
+
+    <div class="ms-center">
+      <div class="ms-track-icon" id="ms-track-icon">☕</div>
+      <h2 class="ms-track-name" id="ms-track-name">Café Morning</h2>
+      <p  class="ms-track-sub"  id="ms-track-sub">コーヒーを飲みながら、朝をゆっくり過ごす</p>
+      <div class="ms-progress-wrap">
+        <div class="ms-progress-fill" id="ms-progress-fill"></div>
+      </div>
+    </div>
+
+    <div class="ms-vol-row">
+      <svg class="vol-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 7H7L11 3v14l-4-4H3V7z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M14 6.5a5 5 0 010 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <input type="range" id="ms-vol" class="slider" min="0" max="100" value="70">
+    </div>
+  </div>
+
 </div>
 <script src="app.js"></script>
 </body>

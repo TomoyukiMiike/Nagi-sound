@@ -5254,4 +5254,485 @@ class HealingApp {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => { new HealingApp(); });
+// ═══════════════════════════════════════════════════════════════════════════
+//  凪 Music — everyday BGM with DJ-style auto-transitions
+//  Accessed by tapping the "凪" brand logo in the top-left corner.
+//  Synthesised entirely via Web Audio — no external audio files.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Rhythm / drum synthesis ─────────────────────────────────────────────────
+
+function computeKickBuffer(ac) {
+  const sr = ac.sampleRate, dur = 0.52;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    const f = 42 + 120 * Math.exp(-28 * t);       // pitch sweep 162→42 Hz
+    const env = 0.55 * Math.exp(-14 * t) + 0.45 * Math.exp(-4 * t);
+    d[i] = env * Math.sin(2 * Math.PI * f * t);
+  }
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.88;
+  return buf;
+}
+
+function computeHihatBuffer(ac, open = false) {
+  const sr = ac.sampleRate;
+  const dur = open ? 0.36 : 0.065;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  const dc = open ? 9 : 72;
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    const ring = Math.sin(2*Math.PI*8400*t)*0.22 + Math.sin(2*Math.PI*10600*t)*0.14;
+    d[i] = ((Math.random()*2-1)*0.75 + ring*0.25) * Math.exp(-dc * t);
+  }
+  return buf;
+}
+
+function computeSnareBuffer(ac) {
+  const sr = ac.sampleRate, dur = 0.24;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    const noise = (Math.random()*2-1) * Math.exp(-22 * t);
+    const body  = Math.sin(2*Math.PI*188*t) * Math.exp(-38 * t) * 0.45;
+    const click = Math.exp(-240 * t) * 0.22;
+    d[i] = (noise*0.72 + body + click);
+  }
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.78;
+  return buf;
+}
+
+function computeFMBassBuffer(ac, freq, dur = 0.55) {
+  const sr = ac.sampleRate;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  let carPh = 0, modPh = 0;
+  const carInc = 2*Math.PI*freq/sr;
+  const modInc = 2*Math.PI*freq/sr; // ratio 1:1 self-FM
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    const modIdx = freq * 2.2 * Math.exp(-9 * t);
+    const env = 0.42 * Math.exp(-4.5 * t) + 0.58 * Math.exp(-0.55 * t);
+    d[i] = env * Math.sin(carPh + Math.sin(modPh) * modIdx);
+    carPh += carInc; modPh += modInc;
+  }
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.82;
+  return buf;
+}
+
+function computeRhodesBuffer(ac, freq, dur = 1.6) {
+  // FM electric piano: carrier + decaying modulator → bell-like attack, warm sustain
+  const sr = ac.sampleRate;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  let carPh = 0, modPh = 0;
+  const carInc = 2*Math.PI*freq/sr;
+  const modInc = 2*Math.PI*freq/sr;
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    const modIdx = freq * 3.2 * Math.exp(-5.8 * t);
+    const amp    = 0.18 * Math.exp(-2.2 * t) + 0.82 * Math.exp(-0.14 * t);
+    const h2     = Math.sin(carPh * 2) * 0.10 * Math.exp(-4.5 * t);
+    d[i] = amp * (Math.sin(carPh + Math.sin(modPh) * modIdx) * 0.90 + h2);
+    carPh += carInc; modPh += modInc;
+  }
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.70;
+  return buf;
+}
+
+// ── Music track definitions ─────────────────────────────────────────────────
+// Full C-major JI scale for music mode (F and B are allowed here — this is music, not therapy)
+const MU = {
+  C2:66, F2:88, G2:99, A2:110, B2:123.75,
+  C3:132, D3:148.5, E3:165, F3:176, G3:198, A3:220, B3:247.5,
+  C4:264, D4:297, E4:330, F4:352, G4:396, A4:440, B4:495,
+  C5:528, E5:660, G5:792,
+};
+
+// Chord voicings: bass root + Rhodes pad tones + pentatonic melody pool
+const MCHORDS = {
+  Cmaj7: { bass:MU.C3, pads:[MU.C4,MU.E4,MU.G4,MU.B4],  melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
+  Am7:   { bass:MU.A2, pads:[MU.A3,MU.C4,MU.E4,MU.G4],  melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
+  Fmaj7: { bass:MU.F2, pads:[MU.F3,MU.A3,MU.C4,MU.E4],  melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
+  G7:    { bass:MU.G2, pads:[MU.G3,MU.B3,MU.D4,MU.F4],  melo:[MU.G3,MU.B3,MU.D4,MU.G4,MU.A4] },
+  Am:    { bass:MU.A2, pads:[MU.A3,MU.C4,MU.E4],         melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
+  F:     { bass:MU.F2, pads:[MU.F3,MU.A3,MU.C4],         melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
+  C:     { bass:MU.C3, pads:[MU.C4,MU.E4,MU.G4],         melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
+  G:     { bass:MU.G2, pads:[MU.G3,MU.B3,MU.D4],         melo:[MU.G3,MU.B3,MU.D4,MU.G4,MU.A4] },
+};
+
+// 16-step (16th-note) drum patterns per bar
+const DRUM_PATTERNS = {
+  boomBap:   { k:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], s:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], h:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
+  minimal:   { k:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], s:[0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0], h:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0] },
+  fourFloor: { k:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], s:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], h:[1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,0] },
+};
+
+const MUSIC_TRACKS = [
+  {
+    id: 'cafe', name: 'Café Morning', icon: '☕',
+    sub: 'コーヒーを飲みながら、朝をゆっくり過ごす',
+    bpm: 87, drumPat: 'boomBap', barsPerChord: 4,
+    prog: ['Cmaj7','Am7','Fmaj7','G7'],
+    rhodesSteps:[2,10], rhodesNotes: 3,   // off-beat comping
+    bassSteps:  [0,10], melodChance: 0.28,
+    vol: { k:0.52, s:0.36, h:0.20, bass:0.44, rhodes:0.30, melo:0.18 },
+  },
+  {
+    id: 'evening', name: 'Evening', icon: '🌙',
+    sub: '夜、窓の外を眺めながら',
+    bpm: 75, drumPat: 'minimal', barsPerChord: 8,
+    prog: ['Am7','Fmaj7','Cmaj7','G7'],
+    rhodesSteps:[0,8], rhodesNotes: 4,   // full chord, held
+    bassSteps:  [0],   melodChance: 0.20,
+    vol: { k:0.28, s:0.16, h:0.12, bass:0.36, rhodes:0.38, melo:0.26 },
+  },
+  {
+    id: 'flow', name: 'Flow', icon: '🌿',
+    sub: '歩きながら、自然のリズムで',
+    bpm: 96, drumPat: 'fourFloor', barsPerChord: 4,
+    prog: ['C','G','Am','F'],
+    rhodesSteps:[2,6,10,14], rhodesNotes: 2,  // staccato stabs
+    bassSteps:  [0,8,12],    melodChance: 0.36,
+    vol: { k:0.58, s:0.42, h:0.24, bass:0.50, rhodes:0.24, melo:0.20 },
+  },
+];
+
+// ── NagiMusic class ─────────────────────────────────────────────────────────
+class NagiMusic {
+  constructor() {
+    this.ac = null;
+    this.masterGain = null;
+    this.trackGain  = null;
+    this.isPlaying  = false;
+    this.trackIdx   = 0;
+    this.step       = 0;    // 16th-note step within bar
+    this.bar        = 0;    // bar index (resets on chord cycle)
+    this.totalBars  = 0;    // lifetime bar count for transition timing
+    this._tmr       = null;
+    this._transitioning = false;
+    this._BARS_PER_SWITCH = 40;   // ~3 min at BPM 87
+    this._kickBuf   = null;
+    this._snareBuf  = null;
+    this._hatBuf    = null;
+    this._ohatBuf   = null;
+    this._visRaf    = null;
+    this._analyser  = null;
+    this._audioEl   = null;
+  }
+
+  // ── Public API ─────────────────────────────────────────────────────────────
+
+  open(healingApp) {
+    // Pause healing sounds while music is open
+    if (healingApp && healingApp.isPlaying) healingApp._pause();
+
+    const screen = document.getElementById('music-screen');
+    screen.classList.add('active');
+    requestAnimationFrame(() => screen.classList.add('visible'));
+
+    if (!this.isPlaying) this._startEngine();
+    this._startVis();
+    this._updateUI();
+  }
+
+  close() {
+    const screen = document.getElementById('music-screen');
+    screen.classList.remove('visible');
+    setTimeout(() => screen.classList.remove('active'), 360);
+    this._stopVis();
+  }
+
+  stopEngine() {
+    this.isPlaying = false;
+    if (this._tmr) { clearTimeout(this._tmr); this._tmr = null; }
+    if (this.masterGain && this.ac) {
+      this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.6);
+      setTimeout(() => { try { this.ac.close(); } catch(_){} this.ac = null; }, 3000);
+    }
+    this._stopVis();
+    if (this._audioEl) { try { this._audioEl.pause(); this._audioEl.remove(); } catch(_){} this._audioEl = null; }
+  }
+
+  skipTrack() {
+    if (!this.isPlaying || this._transitioning) return;
+    this._beginTransition(true);
+  }
+
+  setVol(v) {
+    if (this.masterGain && this.ac) this.masterGain.gain.setTargetAtTime(v, this.ac.currentTime, 0.1);
+  }
+
+  // ── Audio engine ───────────────────────────────────────────────────────────
+
+  _startEngine() {
+    this.ac = new (window.AudioContext || window.webkitAudioContext)();
+    if (this.ac.state === 'suspended') this.ac.resume();
+
+    this._analyser = this.ac.createAnalyser();
+    this._analyser.fftSize = 512;
+    this._analyser.smoothingTimeConstant = 0.82;
+
+    this.masterGain = this.ac.createGain();
+    this.masterGain.gain.value = 0;
+    this.masterGain.connect(this._analyser);
+    this._analyser.connect(this.ac.destination);
+
+    // iOS mute-switch bypass
+    if (/iP(hone|ad|od)/.test(navigator.userAgent) && this.ac.createMediaStreamDestination) {
+      try {
+        const dest = this.ac.createMediaStreamDestination();
+        this.masterGain.connect(dest);
+        const el = document.createElement('audio');
+        el.setAttribute('playsinline',''); el.srcObject = dest.stream;
+        el.play().catch(()=>{});
+        document.body.appendChild(el); this._audioEl = el;
+      } catch(_){}
+    }
+
+    this.trackGain = this.ac.createGain();
+    this.trackGain.gain.value = 1;
+    this.trackGain.connect(this.masterGain);
+
+    // Pre-render drum buffers once
+    this._kickBuf  = computeKickBuffer(this.ac);
+    this._snareBuf = computeSnareBuffer(this.ac);
+    this._hatBuf   = computeHihatBuffer(this.ac, false);
+    this._ohatBuf  = computeHihatBuffer(this.ac, true);
+
+    // Fade in
+    const vol = (+document.getElementById('ms-vol').value) / 100;
+    this.masterGain.gain.setTargetAtTime(vol, this.ac.currentTime, 1.2);
+
+    this.isPlaying = true;
+    this.step = this.bar = this.totalBars = 0;
+    this._tick();
+  }
+
+  _tick() {
+    if (!this.isPlaying) return;
+
+    const track   = MUSIC_TRACKS[this.trackIdx];
+    const drum    = DRUM_PATTERNS[track.drumPat];
+    const si      = this.step % 16;                               // step-in-bar 0-15
+    const cycleLen = track.barsPerChord * track.prog.length;      // total bars per chord cycle
+    const chordIdx = Math.floor((this.bar % cycleLen) / track.barsPerChord) % track.prog.length;
+    const chord   = MCHORDS[track.prog[chordIdx]];
+    const when    = this.ac.currentTime;
+    const barsLeft = this._BARS_PER_SWITCH - this.totalBars;
+
+    // ── Drums (muted when very close to transition for DJ effect) ──────────
+    const drumVol = barsLeft <= 2 ? Math.max(0, barsLeft / 2) : 1.0;
+    if (drum.k[si]) this._pb(this._kickBuf,  when, track.vol.k  * drumVol * (0.88 + Math.random()*0.12));
+    if (drum.s[si]) this._pb(this._snareBuf, when, track.vol.s  * drumVol * (0.82 + Math.random()*0.18));
+    if (drum.h[si]) {
+      const useOpen = (si === 14 && Math.random() < 0.25);
+      this._pb(useOpen ? this._ohatBuf : this._hatBuf,
+               when, track.vol.h * (0.55 + Math.random()*0.45));
+    }
+
+    // ── Bass ───────────────────────────────────────────────────────────────
+    if (track.bassSteps.includes(si)) {
+      const bassF = si === 0 ? chord.bass : chord.bass * (Math.random() < 0.5 ? 1.5 : 1.0);
+      const buf = computeFMBassBuffer(this.ac, bassF, 0.45 + Math.random()*0.2);
+      this._pb(buf, when, track.vol.bass * (0.75 + Math.random()*0.25));
+    }
+
+    // ── Rhodes (electric piano chord comping) ──────────────────────────────
+    if (track.rhodesSteps.includes(si)) {
+      const pads = chord.pads.slice(-track.rhodesNotes);  // top N notes
+      pads.forEach((freq, pi) => {
+        const v = track.vol.rhodes * (0.55 + Math.random()*0.30) * (pi === 0 ? 1 : 0.72);
+        const dur = 0.7 + Math.random()*0.6;
+        const buf = computeRhodesBuffer(this.ac, freq, dur);
+        this._pb(buf, when + pi * 0.010, v);  // subtle strum spread
+      });
+    }
+
+    // ── Melody (piano, sparse, pentatonic over chord) ──────────────────────
+    if (si % 4 === 0 && Math.random() < track.melodChance) {
+      const pool = chord.melo;
+      const freq = pool[Math.floor(Math.random() * pool.length)];
+      const dur  = 0.55 + Math.random()*0.75;
+      const v    = track.vol.melo * (0.50 + Math.random()*0.42);
+      this._pb(computePianoBuffer(this.ac, freq, v, dur), when, 1.0);
+    }
+
+    // ── Advance step / bar counters ────────────────────────────────────────
+    this.step++;
+    if (this.step % 16 === 0) {
+      this.bar++;
+      this.totalBars++;
+
+      // Update progress bar (position in current chord cycle)
+      const pct = (this.bar % cycleLen) / cycleLen * 100;
+      const fill = document.getElementById('ms-progress-fill');
+      if (fill) fill.style.width = pct + '%';
+
+      // 4-bar countdown: add open hats for DJ tension
+      if (barsLeft <= 4 && barsLeft > 0 && !this._transitioning) {
+        // done in next tick via drumVol muting above
+      }
+
+      // Trigger transition
+      if (!this._transitioning && this.totalBars >= this._BARS_PER_SWITCH) {
+        this._beginTransition(false);
+      }
+    }
+
+    // Schedule next 16th-note tick with slight human feel
+    const ms = (60 / track.bpm / 4) * 1000 * (0.985 + Math.random()*0.030);
+    this._tmr = setTimeout(() => this._tick(), ms);
+  }
+
+  _pb(buf, when, vol) {
+    if (!this.ac || !this.trackGain) return;
+    try {
+      const src = this.ac.createBufferSource();
+      src.buffer = buf;
+      const g = this.ac.createGain();
+      g.gain.value = Math.max(0, Math.min(1, vol));
+      src.connect(g); g.connect(this.trackGain);
+      src.start(when);
+      src.stop(when + buf.duration + 0.15);
+    } catch(_) {}
+  }
+
+  // ── DJ-style transition ────────────────────────────────────────────────────
+  _beginTransition(immediate) {
+    if (this._transitioning) return;
+    this._transitioning = true;
+
+    const bpm = MUSIC_TRACKS[this.trackIdx].bpm;
+    // Fade duration: immediate skip = 2.5 s, auto = 4 bars in current BPM
+    const fadeSec = immediate ? 2.5 : (4 * 4 * (60 / bpm));
+
+    // Announce transition in UI
+    const sub = document.getElementById('ms-track-sub');
+    if (sub) sub.textContent = '次のトラックへ...';
+
+    // Fade out current track gain
+    this.trackGain.gain.setTargetAtTime(0, this.ac.currentTime, fadeSec / 3.5);
+
+    setTimeout(() => {
+      // Switch track, reset counters
+      this.trackIdx    = (this.trackIdx + 1) % MUSIC_TRACKS.length;
+      this.step        = 0;
+      this.bar         = 0;
+      this.totalBars   = 0;
+      this._transitioning = false;
+
+      // Fade new track in
+      this.trackGain.gain.cancelScheduledValues(this.ac.currentTime);
+      this.trackGain.gain.setValueAtTime(0, this.ac.currentTime);
+      this.trackGain.gain.setTargetAtTime(1, this.ac.currentTime, 2.2);
+
+      this._updateUI();
+    }, fadeSec * 1000);
+  }
+
+  // ── UI helpers ─────────────────────────────────────────────────────────────
+  _updateUI() {
+    const t = MUSIC_TRACKS[this.trackIdx];
+    const icon = document.getElementById('ms-track-icon');
+    const name = document.getElementById('ms-track-name');
+    const sub  = document.getElementById('ms-track-sub');
+    const fill = document.getElementById('ms-progress-fill');
+    if (icon) icon.textContent = t.icon;
+    if (name) name.textContent = t.name;
+    if (sub)  sub.textContent  = t.sub;
+    if (fill) { fill.style.transition = 'none'; fill.style.width = '0%'; }
+  }
+
+  // ── Spectrum visualiser ────────────────────────────────────────────────────
+  _startVis() {
+    const canvas = document.getElementById('ms-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const bars = 52;
+    const smooth = new Float32Array(bars).fill(0);
+
+    const draw = () => {
+      this._visRaf = requestAnimationFrame(draw);
+      const W = canvas.width  = canvas.clientWidth;
+      const H = canvas.height = canvas.clientHeight;
+
+      ctx.clearRect(0, 0, W, H);
+
+      let freqData = null;
+      if (this._analyser) {
+        const arr = new Uint8Array(this._analyser.frequencyBinCount);
+        this._analyser.getByteFrequencyData(arr);
+        freqData = arr;
+      }
+
+      const bw = W / bars - 1;
+      for (let i = 0; i < bars; i++) {
+        const raw = freqData
+          ? (freqData[Math.floor(i * freqData.length / bars / 1.8)] / 255)
+          : (Math.sin(Date.now()/1800 + i*0.38)*0.5+0.5) * 0.07;  // idle wave
+
+        smooth[i] += (raw - smooth[i]) * 0.18;
+        const h = smooth[i] * H * 0.60;
+        const x = i * (W / bars);
+        const alpha = 0.14 + smooth[i] * 0.42;
+        // Gradient fill: blue at bottom, purple at peak
+        const grad = ctx.createLinearGradient(0, H, 0, H - h);
+        grad.addColorStop(0, `rgba(56,189,248,${alpha})`);
+        grad.addColorStop(1, `rgba(167,139,250,${alpha * 0.7})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, H - h, bw, h);
+      }
+    };
+    draw();
+  }
+
+  _stopVis() {
+    if (this._visRaf) { cancelAnimationFrame(this._visRaf); this._visRaf = null; }
+  }
+}
+
+// ── Bootstrap ───────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const healingApp = new HealingApp();
+  const nagiMusic  = new NagiMusic();
+
+  // ── Open music mode when tapping the "凪" brand ──
+  document.querySelector('.brand').addEventListener('click', () => {
+    nagiMusic.open(healingApp);
+  });
+
+  // ── Back button ──
+  document.getElementById('ms-back-btn').addEventListener('click', () => {
+    nagiMusic.close();
+  });
+
+  // ── Skip track ──
+  document.getElementById('ms-skip-btn').addEventListener('click', () => {
+    nagiMusic.skipTrack();
+  });
+
+  // ── Music volume knob ──
+  document.getElementById('ms-vol').addEventListener('input', e => {
+    nagiMusic.setVol(+e.target.value / 100);
+  });
+
+  // ── Resume AC on user interaction (iOS) ──
+  const resumeMusic = () => {
+    if (nagiMusic.ac && nagiMusic.ac.state === 'suspended') nagiMusic.ac.resume().catch(()=>{});
+  };
+  document.addEventListener('touchstart', resumeMusic, { passive: true });
+  document.addEventListener('click',      resumeMusic, { passive: true });
+});
