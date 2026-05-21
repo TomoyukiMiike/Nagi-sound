@@ -633,25 +633,34 @@ const PRESETS = {
             ], bpm:7, startDelay:10, vol:0.30 },
           { type:'bowl',      name:'チベタンボウル',     icon:'🔔', interval:28000, vol:0.36 },
           { type:'guitar',    name:'アコギアルペジオ',   icon:'🎸',
+            // Fix You-inspired: circular waterfall patterns, peak→descent→return.
+            // G3 removed — its 3rd harmonic (594Hz) clashes with solfeggio C5 (528Hz).
+            // All patterns use only C4/E4/G4 so any simultaneous glock note is consonant.
             patterns:[
-              [_.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.G3, _.C4],
-              [_.G3, _.C4, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4],
-              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
-              [_.G4, _.E4, _.C4, _.G3, _.C4, _.E4, _.G3, _.C4],
+              [_.G4, _.E4, _.C4, _.E4, _.G4, _.E4, _.G4, _.C4],  // P1: peak→fall→rise (Fix You verse)
+              [_.C4, _.G4, _.E4, _.C4, _.E4, _.C4, _.G4, _.E4],  // P2: root anchor reaching to G4
+              [_.G4, _.E4, _.C4, _.G4, _.C4, _.E4, _.C4, _.G4],  // P3: G4↔C4 dialogue
+              [_.E4, _.C4, _.E4, _.G4, _.E4, _.G4, _.C4, _.E4],  // P4: E4-center, climbing to G4
             ], bpm:77, startDelay:8, vol:0.28 },
           { type:'glock',     name:'鉄琴',         icon:'🎵',
+            // Simplified to root (C4), perfect-5th (G4), and upper octave (C5=solfeggio).
+            // These 3 notes are ALWAYS consonant with any C/E/G guitar note,
+            // eliminating harmonic clashes regardless of BPM drift between instruments.
             patterns:[
-              [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
-              [_.E4, null, _.C4, null, _.E4, null, _.C4, null],
-              [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
-              [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
-            ], bpm:77, startDelay:16, vol:0.22 },
+              [_.G4, null, _.C4, null, _.G4, null, _.C4, null],  // P1: G4-C4 alternation
+              [_.C4, null, _.G4, null, _.C4, null, _.G4, null],  // P2: C4-G4 alternation
+              [_.G4, null, _.C5, null, _.G4, null, _.C4, null],  // P3: C5 sparkle (solfeggio)
+              [_.C4, null, _.G4, null, _.C5, null, _.G4, null],  // P4: ascending C4→G4→C5
+            ], bpm:77, startDelay:16, vol:0.20 },
           { type:'orgol',     name:'オルゴール',         icon:'🎶',
+            // E5=660Hz removed: glock's 2nd inharmonic mode of C4 (264×2.756=727Hz)
+            // sits only 67Hz from E5, inside the critical bandwidth → roughness.
+            // Keeping only C5 (solfeggio root) and G4 (perfect 5th): always consonant.
             patterns:[
-              [_.C5, null, null, null, _.G4, null, null, null],
-              [null, _.E5, null, null, null, _.C5, null, null],
-              [_.G4, null, null, _.C5, null, null, _.E5, null],
-              [_.C5, null, null, null, null, null, _.G4, null],
+              [_.C5, null, null, null, _.G4, null, null, null],  // P1: C5 then G4
+              [null, _.G4, null, null, null, _.C5, null, null],  // P2: G4 then C5
+              [_.G4, null, null, _.C5, null, null, _.G4, null],  // P3: G4-C5 dialogue
+              [_.C5, null, null, null, null, null, _.G4, null],  // P4: sparse
             ], bpm:60, startDelay:26, vol:0.17 },
         ]},
         { name:'ディープ', layers: [
@@ -675,23 +684,23 @@ const PRESETS = {
           { type:'bowl',      name:'チベタンボウル',      icon:'🔔', interval:28000, vol:0.36 },
           { type:'guitar',    name:'アコギアルペジオ',    icon:'🎸',
             patterns:[
-              [_.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.G3, _.C4],
-              [_.G3, _.C4, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4],
-              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
-              [_.G4, _.E4, _.C4, _.G3, _.C4, _.E4, _.G3, _.C4],
+              [_.G4, _.E4, _.C4, _.E4, _.G4, _.E4, _.G4, _.C4],
+              [_.C4, _.G4, _.E4, _.C4, _.E4, _.C4, _.G4, _.E4],
+              [_.G4, _.E4, _.C4, _.G4, _.C4, _.E4, _.C4, _.G4],
+              [_.E4, _.C4, _.E4, _.G4, _.E4, _.G4, _.C4, _.E4],
             ], bpm:77, startDelay:8, vol:0.28 },
           { type:'glock',     name:'鉄琴',          icon:'🎵',
             patterns:[
-              [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
-              [_.E4, null, _.C4, null, _.E4, null, _.C4, null],
-              [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
-              [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
-            ], bpm:77, startDelay:16, vol:0.22 },
+              [_.G4, null, _.C4, null, _.G4, null, _.C4, null],
+              [_.C4, null, _.G4, null, _.C4, null, _.G4, null],
+              [_.G4, null, _.C5, null, _.G4, null, _.C4, null],
+              [_.C4, null, _.G4, null, _.C5, null, _.G4, null],
+            ], bpm:77, startDelay:16, vol:0.20 },
           { type:'orgol',     name:'オルゴール',          icon:'🎶',
             patterns:[
               [_.C5, null, null, null, _.G4, null, null, null],
-              [null, _.E5, null, null, null, _.C5, null, null],
-              [_.G4, null, null, _.C5, null, null, _.E5, null],
+              [null, _.G4, null, null, null, _.C5, null, null],
+              [_.G4, null, null, _.C5, null, null, _.G4, null],
               [_.C5, null, null, null, null, null, _.G4, null],
             ], bpm:60, startDelay:26, vol:0.17 },
           { type:'wind',      name:'風の音',              icon:'🍃', vol:0.16 },
@@ -709,23 +718,23 @@ const PRESETS = {
             ], bpm:10, startDelay:10, vol:0.26 },
           { type:'guitar',   name:'アコギアルペジオ',    icon:'🎸',
             patterns:[
-              [_.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.G3, _.C4],
-              [_.G3, _.C4, _.G3, _.C4, _.E4, _.G4, _.E4, _.C4],
-              [_.C4, _.E4, _.G4, _.E4, _.C4, _.G3, _.C4, _.E4],
-              [_.G4, _.E4, _.C4, _.G3, _.C4, _.E4, _.G3, _.C4],
+              [_.G4, _.E4, _.C4, _.E4, _.G4, _.E4, _.G4, _.C4],
+              [_.C4, _.G4, _.E4, _.C4, _.E4, _.C4, _.G4, _.E4],
+              [_.G4, _.E4, _.C4, _.G4, _.C4, _.E4, _.C4, _.G4],
+              [_.E4, _.C4, _.E4, _.G4, _.E4, _.G4, _.C4, _.E4],
             ], bpm:77, startDelay:12, vol:0.24 },
           { type:'glock',    name:'鉄琴',           icon:'🎵',
             patterns:[
-              [_.G4, null, _.E4, null, _.G4, null, _.C4, null],
-              [_.E4, null, _.C4, null, _.E4, null, _.C4, null],
-              [_.G4, null, _.C5, null, _.G4, null, _.E4, null],
-              [_.E4, null, _.G4, null, _.E4, null, _.C4, null],
+              [_.G4, null, _.C4, null, _.G4, null, _.C4, null],
+              [_.C4, null, _.G4, null, _.C4, null, _.G4, null],
+              [_.G4, null, _.C5, null, _.G4, null, _.C4, null],
+              [_.C4, null, _.G4, null, _.C5, null, _.G4, null],
             ], bpm:77, startDelay:20, vol:0.20 },
           { type:'orgol',    name:'オルゴール',            icon:'🎶',
             patterns:[
               [_.C5, null, null, null, _.G4, null, null, null],
-              [null, _.E5, null, null, null, _.C5, null, null],
-              [_.G4, null, null, _.C5, null, null, _.E5, null],
+              [null, _.G4, null, null, null, _.C5, null, null],
+              [_.G4, null, null, _.C5, null, null, _.G4, null],
               [_.C5, null, null, null, null, null, _.G4, null],
             ], bpm:60, startDelay:32, vol:0.16 },
         ]},
@@ -3168,7 +3177,9 @@ class HealingApp {
       const freq = curPat[noteIdx];
       if (freq) {
         const velocity = 0.28 + Math.random() * 0.38;
-        const dur      = 1.2 + Math.random() * 0.5;
+        // 1.6–2.2s: notes overlap ~1.5 beats at BPM 77, creating the lush
+        // ringing chord quality of Fix You without muddying (all notes are C/E/G)
+        const dur      = 1.6 + Math.random() * 0.6;
         const buf = computeGuitarBuffer(this.ac, freq, velocity, dur);
         const src = this.ac.createBufferSource();
         src.buffer = buf;
