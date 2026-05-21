@@ -3212,7 +3212,10 @@ class HealingApp {
 
     this._stopBreathGuide();
 
-    this._stopTimer();
+    // NOTE: _stopTimer() is intentionally NOT called here.
+    // The countdown timer is independent of which layers are playing —
+    // it must survive preset/mode/melody switches so the scheduled
+    // auto-stop still fires at the correct time.
     if (this.animFrame) { cancelAnimationFrame(this.animFrame); this.animFrame = null; }
 
     this.layers.forEach(l => {
@@ -3233,11 +3236,17 @@ class HealingApp {
     if (!this.ac || this.ac.state === 'closed') {
       this._initAudio();
     } else {
-      // AudioContext is alive — restore masterGain to target volume immediately
-      const vol = +document.getElementById('master-vol').value / 100;
+      // AudioContext is alive — restore masterGain to target volume immediately.
+      // If the countdown timer is inside its final 90-second fade window,
+      // restore only to the already-reduced timer-proportional level (not full vol)
+      // so the fade-out is not reset by a preset/mode switch.
+      const fullVol = +document.getElementById('master-vol').value / 100;
+      const timerVol = (this.timerInterval && this.timerRemaining > 0 && this.timerRemaining <= 90)
+        ? fullVol * (this.timerRemaining / 90)
+        : fullVol;
       this.masterGain.gain.cancelScheduledValues(this.ac.currentTime);
       this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, this.ac.currentTime);
-      this.masterGain.gain.linearRampToValueAtTime(vol, this.ac.currentTime + 0.05);
+      this.masterGain.gain.linearRampToValueAtTime(timerVol, this.ac.currentTime + 0.05);
       if (this.ac.state === 'suspended') this.ac.resume();
     }
 
@@ -3526,11 +3535,16 @@ class HealingApp {
       this._updateTimerDisplay();
       if (this.timerRemaining <= 0) {
         this._stopTimer();
-        if (this.masterGain) this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 3);
-        setTimeout(() => { this._stopAll(); this._showHome(); }, 10000);
+        // Gentle fade-out: exponential decay with 4s time constant → ~98% gone in 20s
+        if (this.masterGain) this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 4);
+        // Stop all audio 20s after timer expiry (gives 4-time-constants of fade)
+        setTimeout(() => { this._stopAll(); this._showHome(); }, 20000);
       } else if (this.timerRemaining <= 90 && this.masterGain) {
+        // Last 90 seconds: gradually reduce volume so the ending feels natural
         const vol = document.getElementById('master-vol').value / 100;
-        this.masterGain.gain.setTargetAtTime(vol * (this.timerRemaining / 90), this.ac.currentTime, 5);
+        const targetVol = vol * (this.timerRemaining / 90);
+        this.masterGain.gain.cancelScheduledValues(this.ac.currentTime);
+        this.masterGain.gain.setTargetAtTime(targetVol, this.ac.currentTime, 2);
       }
     }, 1000);
   }
