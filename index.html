@@ -142,8 +142,10 @@
         </svg>
       </button>
       <span class="ms-brand">凪 Music</span>
-      <button class="ms-skip-btn" id="ms-skip-btn">次へ →</button>
+      <button class="ms-skip-btn" id="ms-skip-btn" aria-label="次のトラックへ">次へ ›</button>
     </div>
+    <!-- Situation tab rail (populated by NagiMusic._renderTabs()) -->
+    <div id="ms-track-rail" class="ms-track-rail" role="tablist"></div>
 
     <canvas id="ms-canvas" class="ms-canvas"></canvas>
 

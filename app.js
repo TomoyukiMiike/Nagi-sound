@@ -5378,27 +5378,39 @@ const MU = {
   C5:528, E5:660, G5:792,
 };
 
-// Chord voicings: bass root + Rhodes pad tones + melody pool
+// Chord voicings
+// bass  : played by FM bass in the 66-132 Hz register
+// pads  : Rhodes comping — spread from G3(198Hz) upward for full body
+// padLow: first 2 pads used by sustaining sine pad (always G3–B3 range)
+// melo  : melody pool (C4–C5 range, played by piano buffer)
 const MCHORDS = {
-  Cmaj7: { bass:MU.C2, pads:[MU.E4,MU.G4,MU.B4,MU.C5], melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
-  Am7:   { bass:MU.A2, pads:[MU.C4,MU.E4,MU.G4,MU.A4], melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
-  Fmaj7: { bass:MU.F2, pads:[MU.A3,MU.C4,MU.E4,MU.F4], melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
-  G7:    { bass:MU.G2, pads:[MU.B3,MU.D4,MU.F4,MU.G4], melo:[MU.G3,MU.B3,MU.D4,MU.F4,MU.G4] },
-  Am:    { bass:MU.A2, pads:[MU.C4,MU.E4,MU.A4],        melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
-  F:     { bass:MU.F2, pads:[MU.A3,MU.C4,MU.F4],        melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
-  C:     { bass:MU.C2, pads:[MU.E4,MU.G4,MU.C5],        melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
-  G:     { bass:MU.G2, pads:[MU.B3,MU.D4,MU.G4],        melo:[MU.G3,MU.B3,MU.D4,MU.G4,MU.A4] },
+  Cmaj7: { bass:MU.C2, pads:[MU.G3,MU.B3,MU.E4,MU.G4],  melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
+  Am7:   { bass:MU.A2, pads:[MU.G3,MU.C4,MU.E4,MU.A4],  melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
+  Fmaj7: { bass:MU.F2, pads:[MU.A3,MU.C4,MU.E4,MU.A4],  melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
+  G7:    { bass:MU.G2, pads:[MU.B3,MU.D4,MU.F4,MU.G4],  melo:[MU.G3,MU.B3,MU.D4,MU.F4,MU.G4] },
+  Am:    { bass:MU.A2, pads:[MU.A3,MU.C4,MU.E4,MU.A4],  melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
+  F:     { bass:MU.F2, pads:[MU.F3,MU.A3,MU.C4,MU.F4],  melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
+  C:     { bass:MU.C2, pads:[MU.G3,MU.C4,MU.E4,MU.G4],  melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
+  G:     { bass:MU.G2, pads:[MU.B3,MU.D4,MU.G4],         melo:[MU.G3,MU.B3,MU.D4,MU.G4,MU.A4] },
+  Dm7:   { bass:MU.D3, pads:[MU.A3,MU.C4,MU.F4,MU.A4],  melo:[MU.D4,MU.F4,MU.A4,MU.C5,MU.D4] },
 };
 
 // 16-step drum patterns (16th notes per bar)
 const DRUM_PATTERNS = {
+  // Boom-bap: kick on 1+3, snare on 2+4, 8th-note hats
   boomBap:   { k:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], s:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], h:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
+  // Minimal: sparse kick, ghost snare, quarter-note hats
   minimal:   { k:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], s:[0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0], h:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0] },
+  // Four-on-floor: kick every beat, snare 2+4, busy hats
   fourFloor: { k:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], s:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], h:[1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,0] },
+  // Steady off-beat hats: lo-fi focus feel, kick 1+3, snare 2+4
+  steadyHat: { k:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], s:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], h:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0] },
+  // Ambient: near-silent (volumes set to ~0 in track def)
+  ambient:   { k:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], s:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], h:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] },
 };
 
 // Bass line patterns — 16 steps, value = multiplier on chord.bass (0 = rest)
-// 1 = root, 1.5 = fifth (adds walking character), 2 = octave
+// 1 = root, 1.5 = fifth (walking feel), 2 = octave
 const BASS_LINES = {
   Cmaj7: [1,0,0,0, 0,0,0,0, 1,0,0,0, 1.5,0,0,0],
   Am7:   [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,  0,0,0],
@@ -5408,40 +5420,70 @@ const BASS_LINES = {
   F:     [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,  0,0,0],
   C:     [1,0,0,0, 0,0,0,0, 1,0,0,0, 1.5,0,0,0],
   G:     [1,0,0,0, 0,0,1.5,0, 1,0,0,0, 0,  0,0,0],
+  Dm7:   [1,0,0,0, 0,0,0,0, 1,0,0,0, 1.5,0,0,0],
 };
 
-// Rhodes comping steps per track
-// Steps where Rhodes chord is triggered (0=beat1, 4=beat2, 8=beat3, 12=beat4)
+// 6 situation tracks — tabs match the healing mode categories
 const MUSIC_TRACKS = [
   {
-    id: 'cafe', name: 'Café Morning', icon: '☕',
-    sub: 'コーヒーを飲みながら、朝をゆっくり過ごす',
+    id: 'morning', name: '朝', icon: '🌅',
+    sub: 'コーヒーと朝の光の中で',
     bpm: 87, drumPat: 'boomBap', barsPerChord: 4,
     prog: ['Cmaj7','Am7','Fmaj7','G7'],
-    rhodesSteps: [2, 10],   // off-beat "and" comping
+    rhodesSteps: [2, 10],   // "and-of-1" / "and-of-3" offbeat comping
     rhodesNotes: 3,
     melodChance: 0.30,
-    vol: { k:0.52, s:0.38, h:0.18, bass:0.46, rhodes:0.32, melo:0.22, pad:0.05 },
+    vol: { k:0.54, s:0.40, h:0.20, bass:0.58, rhodes:0.34, melo:0.20, pad:0.06 },
   },
   {
-    id: 'evening', name: 'Evening', icon: '🌙',
-    sub: '夜、窓の外を眺めながら',
-    bpm: 76, drumPat: 'minimal', barsPerChord: 8,
-    prog: ['Am7','Fmaj7','Cmaj7','G7'],
+    id: 'relax', name: 'リラックス', icon: '🌿',
+    sub: '深呼吸して、ゆっくりと',
+    bpm: 72, drumPat: 'minimal', barsPerChord: 8,
+    prog: ['Cmaj7','Fmaj7','Am7','G7'],
     rhodesSteps: [0, 8],    // on the beat, long sustain
     rhodesNotes: 4,
-    melodChance: 0.18,
-    vol: { k:0.26, s:0.16, h:0.10, bass:0.36, rhodes:0.40, melo:0.24, pad:0.07 },
+    melodChance: 0.20,
+    vol: { k:0.26, s:0.18, h:0.10, bass:0.50, rhodes:0.42, melo:0.18, pad:0.09 },
   },
   {
-    id: 'flow', name: 'Flow', icon: '🌿',
-    sub: '歩きながら、自然のリズムで',
+    id: 'walk', name: '散歩', icon: '🚶',
+    sub: '街を歩きながら',
     bpm: 96, drumPat: 'fourFloor', barsPerChord: 4,
     prog: ['C','G','Am','F'],
-    rhodesSteps: [2, 6, 10, 14],  // staccato stabs on every beat-and
+    rhodesSteps: [2, 6, 10, 14],  // every beat-and, staccato stabs
     rhodesNotes: 2,
     melodChance: 0.38,
-    vol: { k:0.56, s:0.44, h:0.22, bass:0.50, rhodes:0.26, melo:0.22, pad:0.04 },
+    vol: { k:0.60, s:0.46, h:0.24, bass:0.56, rhodes:0.28, melo:0.22, pad:0.05 },
+  },
+  {
+    id: 'focus', name: '集中', icon: '✨',
+    sub: '作業に没頭する時間',
+    bpm: 84, drumPat: 'steadyHat', barsPerChord: 4,
+    prog: ['Am7','G7','Fmaj7','Cmaj7'],
+    rhodesSteps: [0, 8],
+    rhodesNotes: 3,
+    melodChance: 0.14,   // very sparse melody — don't distract
+    vol: { k:0.46, s:0.32, h:0.18, bass:0.54, rhodes:0.34, melo:0.14, pad:0.07 },
+  },
+  {
+    id: 'meditation', name: '瞑想', icon: '🌸',
+    sub: '静かに、ただ存在する',
+    bpm: 60, drumPat: 'ambient', barsPerChord: 8,
+    prog: ['Cmaj7','Fmaj7'],
+    rhodesSteps: [0],    // single hit per bar, long decay
+    rhodesNotes: 4,
+    melodChance: 0.08,
+    vol: { k:0.0, s:0.0, h:0.0, bass:0.40, rhodes:0.46, melo:0.14, pad:0.12 },
+  },
+  {
+    id: 'night', name: '夜', icon: '🌙',
+    sub: '夜、窓の外を眺めながら',
+    bpm: 68, drumPat: 'minimal', barsPerChord: 8,
+    prog: ['Am7','Fmaj7','Cmaj7','G7'],
+    rhodesSteps: [0, 8],
+    rhodesNotes: 4,
+    melodChance: 0.16,
+    vol: { k:0.22, s:0.14, h:0.08, bass:0.46, rhodes:0.44, melo:0.16, pad:0.09 },
   },
 ];
 
@@ -5455,11 +5497,9 @@ class NagiMusic {
     this.trackIdx      = 0;
     this._step         = 0;        // 0-15 within current bar
     this._bar          = 0;        // bars elapsed in current chord cycle
-    this._totalBars    = 0;        // lifetime bar counter for transition trigger
     this._nextStepTime = 0;        // AudioContext time of next scheduled step
     this._schedTmr     = null;
     this._transitioning = false;
-    this._BARS_PER_SWITCH = 40;    // ~2-3 min depending on BPM
 
     // Drum buffers (pre-rendered once)
     this._kickBuf  = null;
@@ -5491,6 +5531,7 @@ class NagiMusic {
     screen.classList.add('active');
     requestAnimationFrame(() => screen.classList.add('visible'));
     if (!this.isPlaying) this._startEngine();
+    this._renderTabs();
     this._startVis();
     this._updateUI();
   }
@@ -5517,9 +5558,34 @@ class NagiMusic {
     }
   }
 
-  skipTrack() {
-    if (!this.isPlaying || this._transitioning) return;
-    this._beginTransition(true);
+  // Select a track by index — called by tab clicks or auto-transition
+  selectTrack(idx) {
+    if (idx === this.trackIdx) return;
+    if (this._transitioning) return;
+    this._transitioning = true;
+
+    const sub = document.getElementById('ms-track-sub');
+    if (sub) sub.textContent = '切り替え中...';
+
+    // Short crossfade: 0.8 s
+    this.trackGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.25);
+
+    setTimeout(() => {
+      this.trackIdx      = idx;
+      this._step         = 0;
+      this._bar          = 0;
+      this._lastMeloFreq = null;
+      this._transitioning = false;
+
+      this._stopPad();
+      this._startPad();
+
+      this.trackGain.gain.cancelScheduledValues(this.ac.currentTime);
+      this.trackGain.gain.setValueAtTime(0, this.ac.currentTime);
+      this.trackGain.gain.setTargetAtTime(1, this.ac.currentTime, 0.8);
+
+      this._updateUI();
+    }, 900);
   }
 
   setVol(v) {
@@ -5577,7 +5643,7 @@ class NagiMusic {
 
     // Launch lookahead scheduler
     this.isPlaying = true;
-    this._step = this._bar = this._totalBars = 0;
+    this._step = this._bar = 0;
     this._lastMeloFreq = null;
     this._nextStepTime = this.ac.currentTime + 0.10;
     this._scheduler();
@@ -5699,12 +5765,10 @@ class NagiMusic {
     const chordIdx = Math.floor(barInCy / track.barsPerChord) % track.prog.length;
     const chName   = track.prog[chordIdx];
     const chord    = MCHORDS[chName];
-    const barsLeft = this._BARS_PER_SWITCH - this._totalBars;
 
-    // ── Drums (fade out 2 bars before transition for DJ effect) ────────────
-    const drumVol = barsLeft <= 2 ? Math.max(0, barsLeft / 2) : 1.0;
-    if (drum.k[si]) this._pb(this._kickBuf,  when, track.vol.k * drumVol);
-    if (drum.s[si]) this._pb(this._snareBuf, when, track.vol.s * drumVol);
+    // ── Drums ────────────────────────────────────────────────────────────────
+    if (drum.k[si]) this._pb(this._kickBuf,  when, track.vol.k);
+    if (drum.s[si]) this._pb(this._snareBuf, when, track.vol.s);
     if (drum.h[si]) {
       const useOpen = (si === 14 && Math.random() < 0.25);
       this._pb(useOpen ? this._ohatBuf : this._hatBuf,
@@ -5749,17 +5813,12 @@ class NagiMusic {
     this._step = (this._step + 1) % 16;
     if (this._step === 0) {
       this._bar++;
-      this._totalBars++;
-
+      // Update progress bar — shows position in current chord cycle
       const track    = MUSIC_TRACKS[this.trackIdx];
       const cycleLen = track.barsPerChord * track.prog.length;
       const pct      = (this._bar % cycleLen) / cycleLen * 100;
       const fill     = document.getElementById('ms-progress-fill');
       if (fill) fill.style.width = pct + '%';
-
-      if (!this._transitioning && this._totalBars >= this._BARS_PER_SWITCH) {
-        this._beginTransition(false);
-      }
     }
   }
 
@@ -5794,38 +5853,9 @@ class NagiMusic {
     } catch (_) {}
   }
 
-  // ── DJ-style transition ──────────────────────────────────────────────────────
-
-  _beginTransition(immediate) {
-    if (this._transitioning) return;
-    this._transitioning = true;
-
-    const bpm     = MUSIC_TRACKS[this.trackIdx].bpm;
-    const fadeSec = immediate ? 2.5 : (4 * 4 * (60 / bpm));  // 2.5 s or 4 bars
-
-    const sub = document.getElementById('ms-track-sub');
-    if (sub) sub.textContent = '次のトラックへ...';
-
-    this.trackGain.gain.setTargetAtTime(0, this.ac.currentTime, fadeSec / 3.5);
-
-    setTimeout(() => {
-      this.trackIdx      = (this.trackIdx + 1) % MUSIC_TRACKS.length;
-      this._step         = 0;
-      this._bar          = 0;
-      this._totalBars    = 0;
-      this._lastMeloFreq = null;
-      this._transitioning = false;
-
-      // Restart pad for new track's first chord
-      this._stopPad();
-      this._startPad();
-
-      this.trackGain.gain.cancelScheduledValues(this.ac.currentTime);
-      this.trackGain.gain.setValueAtTime(0, this.ac.currentTime);
-      this.trackGain.gain.setTargetAtTime(1, this.ac.currentTime, 2.2);
-
-      this._updateUI();
-    }, fadeSec * 1000);
+  // Skip to next track (wraps around)
+  skipTrack() {
+    this.selectTrack((this.trackIdx + 1) % MUSIC_TRACKS.length);
   }
 
   // ── UI helpers ───────────────────────────────────────────────────────────────
@@ -5840,6 +5870,27 @@ class NagiMusic {
     if (name) name.textContent = t.name;
     if (sub)  sub.textContent  = t.sub;
     if (fill) { fill.style.transition = 'none'; fill.style.width = '0%'; }
+    // Sync active tab
+    document.querySelectorAll('.ms-track-tab').forEach((btn, i) => {
+      btn.classList.toggle('active', i === this.trackIdx);
+    });
+  }
+
+  // Render (or re-render) the situation tab rail
+  _renderTabs() {
+    const rail = document.getElementById('ms-track-rail');
+    if (!rail) return;
+    rail.innerHTML = '';
+    MUSIC_TRACKS.forEach((t, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'ms-track-tab' + (i === this.trackIdx ? ' active' : '');
+      btn.setAttribute('aria-selected', i === this.trackIdx ? 'true' : 'false');
+      btn.innerHTML =
+        `<span class="ms-ttab-icon">${t.icon}</span>` +
+        `<span class="ms-ttab-label">${t.name}</span>`;
+      btn.addEventListener('click', () => this.selectTrack(i));
+      rail.appendChild(btn);
+    });
   }
 
   // ── Spectrum visualizer ──────────────────────────────────────────────────────
@@ -5903,7 +5954,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nagiMusic.close();
   });
 
-  // ── Skip track ──
+  // ── Skip to next track ──
   document.getElementById('ms-skip-btn').addEventListener('click', () => {
     nagiMusic.skipTrack();
   });
