@@ -5282,7 +5282,7 @@ function computeKickBuffer(ac) {
     d[i] = env * Math.sin(ph);
   }
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.88;
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.96;
   return buf;
 }
 
@@ -5314,7 +5314,7 @@ function computeSnareBuffer(ac) {
     d[i] = noise*0.72 + body + click;
   }
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.78;
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.90;
   return buf;
 }
 
@@ -5471,24 +5471,28 @@ function computeArpNote(ac, freq, dur = 0.14) {
 //  computePianoBuffer defined at the top of this file.
 
 // Acoustic guitar — Karplus-Strong plucked string
-// Front-loaded pick burst → bright attack that decays into warm resonance.
+// Fingerpicked: gentle, uniform initial excitation → warm attack, long resonant sustain.
+//
+// KS physics: y[n] = g*(x[n] + x[n-1])  →  DC loop gain = 2g.
+// With g=0.49997: DC gain = 0.99994 per sample.
+// At G3 (196 Hz, N=225): per-period gain = 0.99994^225 ≈ 0.9866 → T60 ≈ 2.6 s ✓
+// (Same T60 across all frequencies — fundamental property of the KS algorithm.)
 function computePickGuitar(ac, freq, dur = 2.8) {
   const sr  = ac.sampleRate;
-  const N   = Math.max(2, Math.round(sr / freq));   // delay line = one pitch period
+  const N   = Math.max(2, Math.round(sr / freq));
   const len = Math.min(Math.round(sr * dur), sr * 4);
   const buf = ac.createBuffer(1, len, sr);
   const d   = buf.getChannelData(0);
 
-  // Initial pluck: front-loaded noise burst (stronger at pick point)
+  // Gentle fingerpick: slightly front-loaded, softer than a hard pick
   const ring = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     const t = i / N;
-    ring[i] = (Math.random() * 2 - 1) * (0.25 + 0.75 * Math.exp(-3.5 * t));
+    ring[i] = (Math.random() * 2 - 1) * (0.50 + 0.50 * Math.exp(-1.5 * t));
   }
 
-  // Karplus-Strong two-point average feedback
-  // g = 0.498: gain per period ≈ 0.996 → bright guitar decay ~1–3 s
-  const g = 0.498;
+  // g = 0.49997 → T60 ≈ 2.6 s (correct acoustic guitar sustain)
+  const g = 0.49997;
   let ptr = 0;
   for (let i = 0; i < len; i++) {
     const pp = (ptr + N - 1) % N;
@@ -5499,11 +5503,14 @@ function computePickGuitar(ac, freq, dur = 2.8) {
   }
 
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] /= pk * 1.1;
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.88;
   return buf;
 }
 
-// Bass guitar — Karplus-Strong, warm initial spectrum, longer sustain
+// Bass guitar — Karplus-Strong, warm initial spectrum, clear sustained note.
+//
+// g = 0.49995 → DC gain = 0.9999 per sample → T60 ≈ 1.5 s (same at all bass freqs).
+// Bass intentionally decays a little faster than guitar so it stays punchy.
 function computePickBass(ac, freq, dur = 2.0) {
   const sr  = ac.sampleRate;
   const N   = Math.max(2, Math.round(sr / freq));
@@ -5511,16 +5518,16 @@ function computePickBass(ac, freq, dur = 2.0) {
   const buf = ac.createBuffer(1, len, sr);
   const d   = buf.getChannelData(0);
 
-  // Warm pluck: low-pass the initial noise to reduce high-frequency bite
+  // Warm pluck: heavily low-pass the initial noise for a round, full bass tone
   const ring = new Float32Array(N);
   for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
   let lp = 0;
-  for (let i = 0; i < N; i++) { lp += 0.22 * (ring[i] - lp); ring[i] = lp; }
+  for (let i = 0; i < N; i++) { lp += 0.14 * (ring[i] - lp); ring[i] = lp; }  // fc≈900 Hz
   let pk0 = 0; for (const v of ring) pk0 = Math.max(pk0, Math.abs(v));
   if (pk0 > 0) for (let i = 0; i < N; i++) ring[i] /= pk0;
 
-  // Slightly less damping than guitar → longer sustain for bass
-  const g = 0.499;
+  // g = 0.49995 → T60 ≈ 1.5 s across all bass frequencies
+  const g = 0.49995;
   let ptr = 0;
   for (let i = 0; i < len; i++) {
     const pp = (ptr + N - 1) % N;
@@ -5531,37 +5538,46 @@ function computePickBass(ac, freq, dur = 2.0) {
   }
 
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] /= pk * 1.1;
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.90;
   return buf;
 }
 
-// Piano chord note — fast 4-partial synthesis for pre-rendered chord comping.
-// (Full computePianoBuffer is used for melody, computed on-the-fly.)
-function computePianoChordNote(ac, freq, dur = 1.8) {
-  const sr  = ac.sampleRate;
-  const len = Math.round(sr * dur);
-  const buf = ac.createBuffer(1, len, sr);
-  const d   = buf.getChannelData(0);
-  const ph  = Math.random() * Math.PI * 2;
-  const fDet = freq * 1.0012;                  // +2 cents detuned unison string
+// Piano chord note — 5-partial additive synthesis, 2.4-second sustain.
+// This is the main comping instrument; it needs to ring clearly above guitar.
+// Two slightly detuned unison strings (+0 / +2 cents) create the characteristic
+// piano chorus/shimmer effect.
+function computePianoChordNote(ac, freq, dur = 2.4) {
+  const sr   = ac.sampleRate;
+  const len  = Math.round(sr * dur);
+  const buf  = ac.createBuffer(1, len, sr);
+  const d    = buf.getChannelData(0);
+  const ph   = Math.random() * Math.PI * 2;
+  const fD1  = freq * 1.0012;   // +2 cents   (string 2)
+  const fD2  = freq * 0.9994;   // −1 cent     (string 3, subtle width)
 
   for (let i = 0; i < len; i++) {
     const t   = i / sr;
-    const att = t < 0.004 ? t / 0.004 : 1.0;  // 4 ms hammer attack
+    const att = t < 0.005 ? t / 0.005 : 1.0;   // 5 ms hammer attack
     let s = 0;
-    s += 0.62 * Math.exp(-0.45 * t) * Math.sin(2 * Math.PI * freq       * t + ph);
-    s += 0.22 * Math.exp(-1.10 * t) * Math.sin(2 * Math.PI * freq * 2   * t + ph * 1.3);
-    s += 0.09 * Math.exp(-2.40 * t) * Math.sin(2 * Math.PI * freq * 3   * t + ph * 2.1);
-    s += 0.04 * Math.exp(-4.80 * t) * Math.sin(2 * Math.PI * freq * 4   * t + ph * 3.5);
-    s += 0.16 * Math.exp(-0.50 * t) * Math.sin(2 * Math.PI * fDet       * t + ph * 0.9);
+    // Fundamental — dominant, slow decay
+    s += 0.55 * Math.exp(-0.32 * t) * Math.sin(2 * Math.PI * freq  * t + ph);
+    // 2nd harmonic
+    s += 0.20 * Math.exp(-0.90 * t) * Math.sin(2 * Math.PI * freq * 2 * t + ph * 1.3);
+    // 3rd harmonic
+    s += 0.09 * Math.exp(-2.00 * t) * Math.sin(2 * Math.PI * freq * 3 * t + ph * 2.1);
+    // 4th harmonic
+    s += 0.04 * Math.exp(-4.00 * t) * Math.sin(2 * Math.PI * freq * 4 * t + ph * 3.5);
+    // Detuned unison strings (chorus shimmer)
+    s += 0.18 * Math.exp(-0.35 * t) * Math.sin(2 * Math.PI * fD1 * t + ph * 0.9);
+    s += 0.10 * Math.exp(-0.38 * t) * Math.sin(2 * Math.PI * fD2 * t + ph * 1.1);
     // Hammer knock transient
-    if (i < Math.round(sr * 0.014))
-      s += (Math.random() * 2 - 1) * 0.07 * Math.exp(-i / (sr * 0.003));
+    if (i < Math.round(sr * 0.016))
+      s += (Math.random() * 2 - 1) * 0.08 * Math.exp(-i / (sr * 0.003));
     d[i] = s * att;
   }
 
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.78;
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.92;
   return buf;
 }
 
@@ -5723,11 +5739,13 @@ const MUSIC_TRACKS = [
     id: 'morning', name: '朝', icon: '🌅',
     sub: 'コーヒーと朝の光の中で',
     bpmRange: [84,90], drumPat: 'boomBap', barsPerChord: 4,
-    pianoSteps: [2, 10],   // offbeat comping
-    pianoNotes: 3,
-    guitarDensity: 0.78,
-    melodChance: 0.30,
-    vol: { k:0.54, s:0.40, h:0.20, bass:0.58, piano:0.32, guitar:0.38, melo:0.20, pad:0.06 },
+    pianoSteps: [0, 8],        // on the beat — clear, bright morning chord
+    pianoNotes: 4,             // full voicing
+    guitarDensity: 0.40,       // gentle arpeggio accent
+    melodChance: 0.32,
+    //  piano is the main melodic colour; guitar adds fingerpicked texture;
+    //  drums and bass are prominent but not overwhelming
+    vol: { k:0.74, s:0.56, h:0.26, bass:0.72, piano:0.64, guitar:0.18, melo:0.26, pad:0.05 },
   },
   {
     id: 'relax', name: 'リラックス', icon: '🌿',
@@ -5735,39 +5753,39 @@ const MUSIC_TRACKS = [
     bpmRange: [68,76], drumPat: 'minimal', barsPerChord: 8,
     pianoSteps: [0, 8],
     pianoNotes: 4,
-    guitarDensity: 0.50,
-    melodChance: 0.20,
-    vol: { k:0.26, s:0.18, h:0.10, bass:0.50, piano:0.38, guitar:0.30, melo:0.18, pad:0.09 },
+    guitarDensity: 0.28,       // sparse, very gentle
+    melodChance: 0.22,
+    vol: { k:0.42, s:0.30, h:0.15, bass:0.66, piano:0.68, guitar:0.16, melo:0.22, pad:0.08 },
   },
   {
     id: 'walk', name: '散歩', icon: '🚶',
     sub: '街を歩きながら',
     bpmRange: [92,100], drumPat: 'fourFloor', barsPerChord: 4,
-    pianoSteps: [2, 6, 10, 14],
-    pianoNotes: 2,
-    guitarDensity: 0.88,
+    pianoSteps: [2, 6, 10, 14], // off-beat rhythmic piano stabs
+    pianoNotes: 3,
+    guitarDensity: 0.50,        // moderate — adds movement
     melodChance: 0.38,
-    vol: { k:0.60, s:0.46, h:0.24, bass:0.56, piano:0.26, guitar:0.44, melo:0.22, pad:0.05 },
+    vol: { k:0.78, s:0.62, h:0.28, bass:0.72, piano:0.62, guitar:0.20, melo:0.26, pad:0.04 },
   },
   {
     id: 'focus', name: '集中', icon: '✨',
     sub: '作業に没頭する時間',
     bpmRange: [80,88], drumPat: 'steadyHat', barsPerChord: 4,
     pianoSteps: [0, 8],
-    pianoNotes: 3,
-    guitarDensity: 0.42,
+    pianoNotes: 4,
+    guitarDensity: 0.22,        // very sparse — non-distracting
     melodChance: 0.14,
-    vol: { k:0.46, s:0.32, h:0.18, bass:0.54, piano:0.30, guitar:0.26, melo:0.14, pad:0.07 },
+    vol: { k:0.64, s:0.46, h:0.22, bass:0.70, piano:0.64, guitar:0.14, melo:0.18, pad:0.06 },
   },
   {
     id: 'meditation', name: '瞑想', icon: '🌸',
     sub: '静かに、ただ存在する',
     bpmRange: [56,64], drumPat: 'ambient', barsPerChord: 8,
-    pianoSteps: [0],
+    pianoSteps: [0],            // single chord per bar, long ring
     pianoNotes: 4,
-    guitarDensity: 0.28,
-    melodChance: 0.08,
-    vol: { k:0.0, s:0.0, h:0.0, bass:0.40, piano:0.42, guitar:0.20, melo:0.14, pad:0.12 },
+    guitarDensity: 0.14,        // barely there
+    melodChance: 0.09,
+    vol: { k:0.0, s:0.0, h:0.0, bass:0.56, piano:0.70, guitar:0.12, melo:0.18, pad:0.10 },
   },
   {
     id: 'night', name: '夜', icon: '🌙',
@@ -5775,9 +5793,9 @@ const MUSIC_TRACKS = [
     bpmRange: [64,72], drumPat: 'minimal', barsPerChord: 8,
     pianoSteps: [0, 8],
     pianoNotes: 4,
-    guitarDensity: 0.38,
-    melodChance: 0.16,
-    vol: { k:0.22, s:0.14, h:0.08, bass:0.46, piano:0.40, guitar:0.24, melo:0.16, pad:0.09 },
+    guitarDensity: 0.20,        // soft, infrequent
+    melodChance: 0.18,
+    vol: { k:0.36, s:0.24, h:0.12, bass:0.64, piano:0.68, guitar:0.15, melo:0.20, pad:0.08 },
   },
   {
     id: 'edm', name: 'EDM', icon: '⚡',
@@ -6311,16 +6329,17 @@ class NagiMusic {
       }
     }
 
-    // ── Piano chord comping (additive synthesis) ──────────────────────────────
+    // ── Piano chord comping (additive synthesis) — main sound ────────────────
+    // Full voicing from lowest pad note up; staggered 18 ms for a natural roll.
+    // Bass register (55–132 Hz) is handled by the separate bass instrument,
+    // so the lowest piano pad (G3/A3/F3 ≈ 176–220 Hz) never clashes.
     if (track.pianoSteps.includes(si)) {
-      const pads    = chord.pads;
-      const start   = pads.length >= 4 ? 1 : 0;
-      const voicing = pads.slice(start, start + track.pianoNotes);
+      const voicing = chord.pads.slice(0, track.pianoNotes);
       voicing.forEach((freq, i) => {
         this._pb(
           this._getPianoBuffer(freq),
-          when + i * 0.014,
-          track.vol.piano * (i === 0 ? 1.0 : 0.72)
+          when + i * 0.018,
+          track.vol.piano * (i === 0 ? 1.0 : 0.80)   // inner voices slightly softer
         );
       });
     }
