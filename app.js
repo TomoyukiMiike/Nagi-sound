@@ -5318,6 +5318,152 @@ function computeSnareBuffer(ac) {
   return buf;
 }
 
+// ── EDM synthesis ────────────────────────────────────────────────────────────
+//  Daft Punk-style club sounds: punchy kick, layered clap, sawtooth synth
+//  bass with filter sweep, detuned chord stabs, bright square-wave arp lead.
+
+// EDM kick — stronger pitch sweep, click transient, tanh saturation
+function computeEDMKick(ac) {
+  const sr  = ac.sampleRate, dur = 0.55;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+  let ph = 0;
+  for (let i = 0; i < len; i++) {
+    const t    = i / sr;
+    const freq = 48 + 170 * Math.exp(-38 * t);     // 218→48 Hz fast sweep
+    ph += 2 * Math.PI * freq / sr;
+    const body  = Math.sin(ph) * (0.65 * Math.exp(-10 * t) + 0.35 * Math.exp(-3.0 * t));
+    const click = (Math.random() * 2 - 1) * Math.exp(-260 * t) * 0.55;
+    let s = body + click;
+    s = Math.tanh(s * 2.2) / Math.tanh(2.2);       // hard saturation for punch
+    d[i] = s;
+  }
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.94;
+  return buf;
+}
+
+// EDM clap — two noise bursts 12 ms apart, 1.4 kHz body resonance
+function computeEDMClap(ac) {
+  const sr  = ac.sampleRate, dur = 0.28;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const t  = i / sr;
+    const n1 = (Math.random() * 2 - 1) * Math.exp(-55 * t);
+    const t2 = Math.max(0, t - 0.012);
+    const n2 = t >= 0.012 ? (Math.random() * 2 - 1) * Math.exp(-48 * t2) * 0.72 : 0;
+    const body = Math.sin(2 * Math.PI * 1400 * t) * Math.exp(-90 * t) * 0.28;
+    d[i] = n1 * 0.55 + n2 * 0.38 + body;
+  }
+  // Simple HP to strip low mud from clap
+  let hp = 0, prev = 0;
+  const hpA = 1 - 2 * Math.PI * 500 / sr;
+  for (let i = 0; i < len; i++) {
+    const cur = d[i];
+    hp = hpA * hp + (cur - prev);
+    prev = cur;
+    d[i] = hp * 0.85;
+  }
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.82;
+  return buf;
+}
+
+// Synth bass note — sawtooth wave + LP filter cutoff sweep + soft clip
+// Physically: sawtooth is the waveform of choice for electronic bass (all harmonics)
+// Filter sweeps from bright (1800 Hz) to dark (220 Hz) for the classic "wah" attack
+function computeSynthBassNote(ac, freq, dur = 0.45) {
+  const sr  = ac.sampleRate;
+  const len = Math.min(Math.round(sr * dur), sr);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+  // Phase-accumulator sawtooth
+  let ph = 0;
+  const inc = freq / sr;
+  for (let i = 0; i < len; i++) {
+    ph = (ph + inc) % 1.0;
+    d[i] = 2 * ph - 1;
+  }
+  // One-pole LP with mild resonance feedback + amplitude ADSR
+  let lp = 0;
+  const RESO = 0.20;
+  for (let i = 0; i < len; i++) {
+    const t  = i / sr;
+    const fc = 220 + 1580 * Math.exp(-14 * t);
+    const a  = Math.min(0.995, 2 * Math.PI * fc / sr);
+    lp = lp + a * (d[i] + RESO * lp - lp);
+    const env = 0.65 * Math.exp(-5.5 * t) + 0.35 * Math.exp(-1.2 * t);
+    d[i] = lp * env;
+  }
+  // Soft clip for warmth
+  for (let i = 0; i < len; i++) d[i] = Math.tanh(d[i] * 1.6) / Math.tanh(1.6);
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.82;
+  return buf;
+}
+
+// Chord stab — multiple detuned sawteeth + fast filter close
+// 5-cent clusters around each chord tone → full, warm unison stab sound
+function computeChordStab(ac, freqs, dur = 0.30) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+  // 3 detuned oscillators per chord tone
+  const DET  = [0, 0.0023, -0.0023];
+  const oscs = freqs.flatMap(f => DET.map(dt => ({ ph: Math.random(), inc: f * (1 + dt) / sr })));
+  for (let i = 0; i < len; i++) {
+    let s = 0;
+    for (const o of oscs) {
+      o.ph = (o.ph + o.inc) % 1.0;
+      s += 2 * o.ph - 1;
+    }
+    d[i] = s / oscs.length;
+  }
+  // LP filter: cutoff sweeps 3000→300 Hz (fast close = classic synth stab)
+  let lp = 0;
+  for (let i = 0; i < len; i++) {
+    const t  = i / sr;
+    const fc = 300 + 2700 * Math.exp(-18 * t);
+    const a  = Math.min(0.99, 2 * Math.PI * fc / sr);
+    lp       = lp + a * (d[i] - lp);
+    d[i]     = lp * Math.exp(-10 * t);
+  }
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.80;
+  return buf;
+}
+
+// Arp lead note — square wave, bright attack, staccato decay
+function computeArpNote(ac, freq, dur = 0.14) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+  let ph = 0;
+  const inc = freq / sr;
+  for (let i = 0; i < len; i++) {
+    ph = (ph + inc) % 1.0;
+    d[i] = ph < 0.5 ? 1.0 : -1.0;           // 50% duty square
+  }
+  // LP filter: 8000→800 Hz — bright to mid
+  let lp = 0;
+  for (let i = 0; i < len; i++) {
+    const t  = i / sr;
+    const fc = 800 + 8000 * Math.exp(-30 * t);
+    const a  = Math.min(0.999, 2 * Math.PI * fc / sr);
+    lp       = lp + a * (d[i] - lp);
+    const env = 0.75 * Math.exp(-20 * t) + 0.25 * Math.exp(-4 * t);
+    d[i] = lp * env;
+  }
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.70;
+  return buf;
+}
+
 // ── Instrument synthesis ────────────────────────────────────────────────────
 //  Three real instruments: acoustic guitar, bass guitar, piano.
 //  Guitar + bass use Karplus-Strong plucked-string synthesis (physically based).
@@ -5458,6 +5604,8 @@ const DRUM_PATTERNS = {
   steadyHat: { k:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], s:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], h:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0] },
   // Ambient: near-silent (volumes set to ~0 in track def)
   ambient:   { k:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], s:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], h:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0] },
+  // EDM: 4-on-the-floor kick, clap on 2+4, 8th-note hats (EDM scheduling ignores s[])
+  edmFour:   { k:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], s:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], h:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
 };
 
 // Bass line patterns — 16 steps, value = multiplier on chord.bass (0 = rest)
@@ -5473,6 +5621,47 @@ const BASS_LINES = {
   G:     [1,0,0,0, 0,0,1.5,0, 1,0,0,0, 0,  0,0,0],
   Dm7:   [1,0,0,0, 0,0,0,0, 1,0,0,0, 1.5,0,0,0],
 };
+
+// ── EDM chord data (equal temperament, A4 = 440 Hz) ────────────────────────
+// bass : synth bass root (55–120 Hz)
+// stab : detuned chord stab voicing (100–270 Hz)
+// arp  : lead arpeggio notes (150–530 Hz, one octave above stab)
+const EDM_CHORDS = {
+  Am: { bass:  55.00, stab:[110.00,130.81,164.81,220.00], arp:[220.00,261.63,329.63,440.00] },
+  F:  { bass:  87.31, stab:[110.00,130.81,174.61,220.00], arp:[174.61,220.00,261.63,349.23] },
+  C:  { bass:  65.41, stab:[130.81,164.81,196.00,261.63], arp:[261.63,329.63,392.00,523.25] },
+  G:  { bass:  98.00, stab:[123.47,146.83,196.00,246.94], arp:[196.00,246.94,293.66,392.00] },
+  Dm: { bass:  73.42, stab:[110.00,146.83,174.61,220.00], arp:[146.83,174.61,220.00,293.66] },
+  E:  { bass:  82.41, stab:[103.83,123.47,164.81,207.65], arp:[164.81,207.65,246.94,329.63] },
+  Cm: { bass:  65.41, stab:[130.81,155.56,196.00,261.63], arp:[261.63,311.13,392.00,523.25] },
+  Ab: { bass: 103.83, stab:[130.81,155.56,207.65,261.63], arp:[207.65,261.63,311.13,415.30] },
+  Eb: { bass:  77.78, stab:[ 98.00,116.54,155.56,196.00], arp:[155.56,196.00,233.08,311.13] },
+  Bb: { bass:  58.27, stab:[116.54,146.83,174.61,233.08], arp:[233.08,293.66,349.23,466.16] },
+};
+
+// Synth bass hit patterns (16 steps; 1 = root, 0 = rest)
+const EDM_BASS_PATTERNS = [
+  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],  // syncopated pump (Daft Punk feel)
+  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],  // 4-on-the-floor bass
+  [1,0,0,0, 0,0,1,0, 0,0,1,0, 0,1,0,0],  // driving groove
+  [1,0,1,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],  // house bass
+];
+
+// Chord stab timing (which 16th steps get a stab hit)
+const EDM_STAB_STEPS = [
+  [2, 10],           // off-beat 1 and 3
+  [6, 14],           // off-beat 2 and 4
+  [2, 6, 10, 14],   // every off-beat (driving)
+  [2, 14],           // sparse
+];
+
+// Arpeggio patterns (indices into chord.arp array, 8 steps = one bar at 8th-note grid)
+const EDM_ARP_PATTERNS = [
+  [0,1,2,3, 3,2,1,0],  // up-down
+  [0,2,1,3, 2,0,3,1],  // skip around
+  [0,1,2,3, 0,1,2,3],  // constant ascending
+  [3,2,1,0, 3,2,1,0],  // constant descending
+];
 
 // ── Procedural variation data ────────────────────────────────────────────────
 
@@ -5507,6 +5696,12 @@ const PROG_VARIANTS = {
     ['Am7','Fmaj7','Cmaj7','G7'],
     ['Am7','G7','Fmaj7','Cmaj7'],
     ['Fmaj7','Cmaj7','Am7','G7'],
+  ],
+  // EDM uses EDM_CHORDS (not MCHORDS), so keys reference EDM_CHORDS
+  edm:       [
+    ['Am','F','C','G'],    // classic minor pop/EDM (Daft Punk feel)
+    ['Am','Dm','F','E'],   // minor vamp
+    ['Cm','Ab','Eb','Bb'], // darker French house
   ],
 };
 
@@ -5584,6 +5779,17 @@ const MUSIC_TRACKS = [
     melodChance: 0.16,
     vol: { k:0.22, s:0.14, h:0.08, bass:0.46, piano:0.40, guitar:0.24, melo:0.16, pad:0.09 },
   },
+  {
+    id: 'edm', name: 'EDM', icon: '⚡',
+    sub: 'テンションを上げる電子の波動',
+    bpmRange: [126,132], drumPat: 'edmFour', barsPerChord: 4,
+    pianoSteps: [], pianoNotes: 0,   // EDM uses chord stabs instead
+    guitarDensity: 0,               // no acoustic guitar
+    melodChance: 0,                  // EDM handles melody via arp
+    // vol.clap / vol.stab / vol.arp are EDM-specific
+    vol: { k:0.92, s:0, h:0.24, bass:0.68, piano:0, guitar:0, melo:0, pad:0,
+           clap:0.62, stab:0.44, arp:0.36 },
+  },
 ];
 
 // ── NagiMusic class ─────────────────────────────────────────────────────────
@@ -5618,6 +5824,21 @@ class NagiMusic {
     this._sessionProg      = null; // chord progression for this session
     this._sessionBpm       = 80;
     this._sessionGuitarArp = null; // fingerpicking pattern index array
+
+    // EDM-specific session state
+    this._sessionBassPattern = null;
+    this._sessionStabSteps   = null;
+    this._sessionArpPat      = null;
+
+    // EDM instrument buffer caches
+    this._edmKickBuf  = null;
+    this._edmClapBuf  = null;
+    this._edmBassBufs = new Map();  // freq → AudioBuffer (synth bass)
+    this._edmStabBufs = new Map();  // 'ChordName_stab' → AudioBuffer
+    this._edmArpBufs  = new Map();  // freq → AudioBuffer (arp lead)
+
+    // EDM sidechain compressor gain node (pumping effect)
+    this._edmDuckGain = null;
 
     // Melody continuity
     this._lastMeloFreq = null;
@@ -5710,6 +5931,13 @@ class NagiMusic {
     this._sessionBpm       = lo + Math.floor(Math.random() * (hi - lo + 1));
     this._sessionGuitarArp = GUITAR_ARP_STYLES[Math.floor(Math.random() * GUITAR_ARP_STYLES.length)];
     this._lastMeloFreq     = null;
+
+    // EDM-specific session randomisation
+    if (track.id === 'edm') {
+      this._sessionBassPattern = EDM_BASS_PATTERNS[Math.floor(Math.random() * EDM_BASS_PATTERNS.length)];
+      this._sessionStabSteps   = EDM_STAB_STEPS[Math.floor(Math.random() * EDM_STAB_STEPS.length)];
+      this._sessionArpPat      = EDM_ARP_PATTERNS[Math.floor(Math.random() * EDM_ARP_PATTERNS.length)];
+    }
   }
 
   // ── Audio engine ────────────────────────────────────────────────────────────
@@ -5746,12 +5974,19 @@ class NagiMusic {
     this.trackGain.gain.value = 1;
     this.trackGain.connect(this.masterGain);
 
+    // EDM sidechain gain (sits between EDM synth sounds and trackGain)
+    // Ducked on every kick hit to create the classic pumping compression
+    this._edmDuckGain = this.ac.createGain();
+    this._edmDuckGain.gain.value = 1;
+    this._edmDuckGain.connect(this.trackGain);
+
     // Pre-render all buffers before first tick
     this._kickBuf  = computeKickBuffer(this.ac);
     this._snareBuf = computeSnareBuffer(this.ac);
     this._hatBuf   = computeHihatBuffer(this.ac, false);
     this._ohatBuf  = computeHihatBuffer(this.ac, true);
     this._prerenderNotes();
+    this._prerenderEDM();
 
     // Generate initial session
     this._generateSession();
@@ -5834,10 +6069,139 @@ class NagiMusic {
     return buf;
   }
 
+  // ── EDM buffer pre-render ───────────────────────────────────────────────────
+
+  _prerenderEDM() {
+    this._edmKickBuf = computeEDMKick(this.ac);
+    this._edmClapBuf = computeEDMClap(this.ac);
+
+    (PROG_VARIANTS.edm || []).forEach(prog => {
+      prog.forEach(chName => {
+        const ch = EDM_CHORDS[chName];
+        if (!ch) return;
+        // Bass root
+        if (!this._edmBassBufs.has(ch.bass))
+          this._edmBassBufs.set(ch.bass, computeSynthBassNote(this.ac, ch.bass));
+        // Stab (keyed by chord name)
+        const stabKey = chName + '_stab';
+        if (!this._edmStabBufs.has(stabKey))
+          this._edmStabBufs.set(stabKey, computeChordStab(this.ac, ch.stab));
+        // Arp notes
+        ch.arp.forEach(f => {
+          if (!this._edmArpBufs.has(f))
+            this._edmArpBufs.set(f, computeArpNote(this.ac, f));
+        });
+      });
+    });
+  }
+
+  _getEDMBassBuffer(freq) {
+    let best = null, bestDiff = Infinity;
+    for (const [f, buf] of this._edmBassBufs) {
+      const d = Math.abs(f - freq);
+      if (d < bestDiff) { bestDiff = d; best = buf; }
+    }
+    if (bestDiff < 5) return best;
+    const buf = computeSynthBassNote(this.ac, freq);
+    this._edmBassBufs.set(freq, buf);
+    return buf;
+  }
+
+  _getEDMArpBuffer(freq) {
+    let best = null, bestDiff = Infinity;
+    for (const [f, buf] of this._edmArpBufs) {
+      const d = Math.abs(f - freq);
+      if (d < bestDiff) { bestDiff = d; best = buf; }
+    }
+    if (bestDiff < 3) return best;
+    const buf = computeArpNote(this.ac, freq);
+    this._edmArpBufs.set(freq, buf);
+    return buf;
+  }
+
+  // Sidechain pumping: duck the EDM synth gain on every kick hit
+  // Gain: 1.0 → 0.08 instantly, then recovers to 1.0 in ~180 ms
+  _sidechain(when) {
+    if (!this._edmDuckGain || !this.ac) return;
+    const g = this._edmDuckGain.gain;
+    try {
+      g.cancelScheduledValues(when);
+      g.setValueAtTime(1.0, when);
+      g.linearRampToValueAtTime(0.08, when + 0.007);
+      g.setTargetAtTime(1.0, when + 0.007, 0.055);   // τ ≈ 55 ms → full recovery ~180 ms
+    } catch (_) {}
+  }
+
+  // ── EDM step scheduler ──────────────────────────────────────────────────────
+  // Called instead of the normal healing _scheduleStep when the current track
+  // is EDM. Uses EDM_CHORDS + EDM sidechain ducking for the pumping effect.
+
+  _scheduleEDMStep(when, track, si) {
+    const prog     = this._sessionProg;
+    const cycleLen = track.barsPerChord * prog.length;
+    const barInCy  = this._bar % cycleLen;
+    const chordIdx = Math.floor(barInCy / track.barsPerChord) % prog.length;
+    const chName   = prog[chordIdx];
+    const chord    = EDM_CHORDS[chName];
+    if (!chord) return;
+
+    const duck = this._edmDuckGain;   // sidechain bus
+
+    // ── 4-on-the-floor kick (every beat = si 0, 4, 8, 12) ──────────────────
+    if (si % 4 === 0) {
+      this._pb(this._edmKickBuf, when, track.vol.k);  // bypasses sidechain
+      this._sidechain(when);                          // duck everything else
+    }
+
+    // ── Clap on beats 2 + 4 (steps 4, 12) ───────────────────────────────────
+    if (si === 4 || si === 12) {
+      this._pb(this._edmClapBuf, when, track.vol.clap, duck);
+    }
+
+    // ── 8th-note hihats, with ghost 16th hats randomly ──────────────────────
+    if (si % 2 === 0) {
+      // Accent on off-beats (si = 2, 6, 10, 14)
+      const accent = (si % 4 !== 0) ? 1.0 : 0.52;
+      this._pb(this._hatBuf, when, track.vol.h * accent * (0.65 + Math.random() * 0.35), duck);
+    } else if (Math.random() < 0.28) {
+      // Ghost 16th hat
+      this._pb(this._hatBuf, when, track.vol.h * 0.28 * Math.random(), duck);
+    }
+
+    // ── Synth bass ───────────────────────────────────────────────────────────
+    const bassPat = this._sessionBassPattern;
+    if (bassPat && bassPat[si]) {
+      const buf = this._getEDMBassBuffer(chord.bass);
+      if (buf) this._pb(buf, when, track.vol.bass, duck);
+    }
+
+    // ── Chord stab ───────────────────────────────────────────────────────────
+    if (this._sessionStabSteps && this._sessionStabSteps.includes(si)) {
+      const stabBuf = this._edmStabBufs.get(chName + '_stab');
+      if (stabBuf) this._pb(stabBuf, when, track.vol.stab, duck);
+    }
+
+    // ── Arp lead (8th-note grid, builds over the 4-bar phrase) ───────────────
+    if (si % 2 === 0 && this._sessionArpPat) {
+      const arpStep    = (si / 2) % this._sessionArpPat.length;
+      const noteIdx    = this._sessionArpPat[arpStep];
+      const freq       = chord.arp[Math.min(noteIdx, chord.arp.length - 1)];
+      // Build up: sparse in bars 0–1, dense in bars 2–3 of each phrase
+      const barInPhrase = this._bar % track.barsPerChord;
+      const density     = barInPhrase < 2 ? 0.45 : 0.90;
+      const arpVol      = track.vol.arp * (barInPhrase < 2 ? 0.55 : 1.0);
+      if (Math.random() < density) {
+        const buf = this._getEDMArpBuffer(freq);
+        if (buf) this._pb(buf, when, arpVol, duck);
+      }
+    }
+  }
+
   // ── Sustaining pad (sine oscillators on chord tones) ────────────────────────
 
   _startPad() {
     const track = MUSIC_TRACKS[this.trackIdx];
+    if (track.id === 'edm') return;    // EDM uses synth sounds, no sustain pad
     const prog  = this._sessionProg || PROG_VARIANTS[track.id][0];
     const chord = MCHORDS[prog[0]];
     // Two sine oscillators: bottom two pad tones, very soft
@@ -5896,9 +6260,13 @@ class NagiMusic {
 
   _scheduleStep(when) {
     if (!this.isPlaying || !this.ac) return;
-    const track    = MUSIC_TRACKS[this.trackIdx];
+    const track = MUSIC_TRACKS[this.trackIdx];
+    const si    = this._step;
+
+    // EDM has its own scheduler — separate synthesis, sidechain, etc.
+    if (track.id === 'edm') { this._scheduleEDMStep(when, track, si); return; }
+
     const drum     = DRUM_PATTERNS[track.drumPat];
-    const si       = this._step;
     const prog     = this._sessionProg;
     const cycleLen = track.barsPerChord * prog.length;
     const barInCy  = this._bar % cycleLen;
@@ -5995,15 +6363,19 @@ class NagiMusic {
     return this._lastMeloFreq;
   }
 
-  _pb(buf, when, vol) {
+  // dest: optional AudioNode to connect to (defaults to trackGain)
+  //   EDM synth sounds pass `this._edmDuckGain` for sidechain compression;
+  //   the EDM kick bypasses it and passes null (→ trackGain directly).
+  _pb(buf, when, vol, dest = null) {
     if (!this.ac || !this.trackGain || !buf) return;
+    const target = dest || this.trackGain;
     try {
       const src = this.ac.createBufferSource();
       src.buffer = buf;
       const g = this.ac.createGain();
       g.gain.value = Math.max(0, Math.min(1, vol));
       src.connect(g);
-      g.connect(this.trackGain);
+      g.connect(target);
       src.start(when);
       src.stop(when + buf.duration + 0.05);
     } catch (_) {}
@@ -6038,7 +6410,9 @@ class NagiMusic {
     rail.innerHTML = '';
     MUSIC_TRACKS.forEach((t, i) => {
       const btn = document.createElement('button');
-      btn.className = 'ms-track-tab' + (i === this.trackIdx ? ' active' : '');
+      btn.className = 'ms-track-tab'
+        + (i === this.trackIdx ? ' active' : '')
+        + (t.id === 'edm' ? ' edm-tab' : '');
       btn.setAttribute('aria-selected', i === this.trackIdx ? 'true' : 'false');
       btn.innerHTML =
         `<span class="ms-ttab-icon">${t.icon}</span>` +
@@ -6070,18 +6444,25 @@ class NagiMusic {
         freqData = arr;
       }
 
-      const bw = W / bars - 1;
+      const bw    = W / bars - 1;
+      const isEDM = MUSIC_TRACKS[this.trackIdx].id === 'edm';
       for (let i = 0; i < bars; i++) {
         const raw = freqData
           ? (freqData[Math.floor(i * freqData.length / bars / 1.8)] / 255)
           : (Math.sin(Date.now() / 1800 + i * 0.38) * 0.5 + 0.5) * 0.07;
-        smooth[i] += (raw - smooth[i]) * 0.18;
-        const h     = smooth[i] * H * 0.60;
+        smooth[i] += (raw - smooth[i]) * (isEDM ? 0.28 : 0.18); // EDM reacts faster
+        const h     = smooth[i] * H * (isEDM ? 0.78 : 0.60);    // EDM bars taller
         const x     = i * (W / bars);
         const alpha = 0.14 + smooth[i] * 0.42;
         const grad  = ctx.createLinearGradient(0, H, 0, H - h);
-        grad.addColorStop(0, `rgba(56,189,248,${alpha})`);
-        grad.addColorStop(1, `rgba(167,139,250,${alpha * 0.7})`);
+        if (isEDM) {
+          grad.addColorStop(0,   `rgba(249,115,22,${alpha})`);
+          grad.addColorStop(0.5, `rgba(251,191,36,${alpha * 0.85})`);
+          grad.addColorStop(1,   `rgba(244,114,182,${alpha * 0.65})`);
+        } else {
+          grad.addColorStop(0, `rgba(56,189,248,${alpha})`);
+          grad.addColorStop(1, `rgba(167,139,250,${alpha * 0.7})`);
+        }
         ctx.fillStyle = grad;
         ctx.fillRect(x, H - h, bw, h);
       }

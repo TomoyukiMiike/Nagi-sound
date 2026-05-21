@@ -22,6 +22,7 @@
   --c-sleep:      #818cf8;
   --c-presleep:   #fb923c;
   --c-walk:       #34d399;
+  --c-edm:        #f97316;
 }
 
 html, body {
@@ -649,6 +650,16 @@ html, body {
 }
 .ms-track-tab:active {
   background: rgba(56,189,248,0.22);
+}
+/* EDM tab — electric orange glow */
+.ms-track-tab.edm-tab.active {
+  background: rgba(249,115,22,0.16);
+  border-color: rgba(249,115,22,0.55);
+  color: rgba(255,210,150,0.96);
+  box-shadow: 0 0 18px rgba(249,115,22,0.24), 0 0 6px rgba(251,191,36,0.18);
+}
+.ms-track-tab.edm-tab:active {
+  background: rgba(249,115,22,0.28);
 }
 .ms-ttab-icon  { font-size: 1.25rem; line-height: 1; }
 .ms-ttab-label { font-size: 0.62rem; letter-spacing: 0.03em; }
