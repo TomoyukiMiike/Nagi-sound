@@ -5255,23 +5255,31 @@ class HealingApp {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  凪 Music — everyday BGM with DJ-style auto-transitions
+//  凪 Music v2 — everyday BGM with DJ-style auto-transitions
 //  Accessed by tapping the "凪" brand logo in the top-left corner.
-//  Synthesised entirely via Web Audio — no external audio files.
+//  Synthesised entirely via Web Audio API — no external audio files.
+//
+//  Architecture:
+//  • All note buffers pre-rendered at startup (no real-time compute per step)
+//  • Chris Wilson lookahead scheduler — sample-accurate timing, no drift
+//  • FM synthesis with correct modulation index (1-3, not freq*N)
+//  • Sustaining sine pad for harmonic fullness between Rhodes hits
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ── Rhythm / drum synthesis ─────────────────────────────────────────────────
+// ── Drum synthesis ──────────────────────────────────────────────────────────
 
 function computeKickBuffer(ac) {
   const sr = ac.sampleRate, dur = 0.52;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
   const d = buf.getChannelData(0);
+  let ph = 0;
   for (let i = 0; i < len; i++) {
     const t = i / sr;
-    const f = 42 + 120 * Math.exp(-28 * t);       // pitch sweep 162→42 Hz
+    const freq = 42 + 120 * Math.exp(-28 * t);   // 162→42 Hz sweep
+    ph += 2 * Math.PI * freq / sr;
     const env = 0.55 * Math.exp(-14 * t) + 0.45 * Math.exp(-4 * t);
-    d[i] = env * Math.sin(2 * Math.PI * f * t);
+    d[i] = env * Math.sin(ph);
   }
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
   if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.88;
@@ -5280,11 +5288,11 @@ function computeKickBuffer(ac) {
 
 function computeHihatBuffer(ac, open = false) {
   const sr = ac.sampleRate;
-  const dur = open ? 0.36 : 0.065;
+  const dur = open ? 0.38 : 0.07;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
   const d = buf.getChannelData(0);
-  const dc = open ? 9 : 72;
+  const dc = open ? 8 : 68;
   for (let i = 0; i < len; i++) {
     const t = i / sr;
     const ring = Math.sin(2*Math.PI*8400*t)*0.22 + Math.sin(2*Math.PI*10600*t)*0.14;
@@ -5294,7 +5302,7 @@ function computeHihatBuffer(ac, open = false) {
 }
 
 function computeSnareBuffer(ac) {
-  const sr = ac.sampleRate, dur = 0.24;
+  const sr = ac.sampleRate, dur = 0.26;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
   const d = buf.getChannelData(0);
@@ -5303,146 +5311,185 @@ function computeSnareBuffer(ac) {
     const noise = (Math.random()*2-1) * Math.exp(-22 * t);
     const body  = Math.sin(2*Math.PI*188*t) * Math.exp(-38 * t) * 0.45;
     const click = Math.exp(-240 * t) * 0.22;
-    d[i] = (noise*0.72 + body + click);
+    d[i] = noise*0.72 + body + click;
   }
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
   if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.78;
   return buf;
 }
 
-function computeFMBassBuffer(ac, freq, dur = 0.55) {
+// ── Melodic synthesis ───────────────────────────────────────────────────────
+
+// FM bass — correct modulation index (2.8 at onset, decays to ~0)
+// IMPORTANT: modIdx must be a small number (1-3), NOT freq * constant
+function computeFMBassBuffer(ac, freq, dur = 0.72) {
   const sr = ac.sampleRate;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
   const d = buf.getChannelData(0);
   let carPh = 0, modPh = 0;
-  const carInc = 2*Math.PI*freq/sr;
-  const modInc = 2*Math.PI*freq/sr; // ratio 1:1 self-FM
+  const carInc = 2 * Math.PI * freq / sr;
+  const modInc = 2 * Math.PI * freq / sr;  // 1:1 ratio
   for (let i = 0; i < len; i++) {
     const t = i / sr;
-    const modIdx = freq * 2.2 * Math.exp(-9 * t);
-    const env = 0.42 * Math.exp(-4.5 * t) + 0.58 * Math.exp(-0.55 * t);
-    d[i] = env * Math.sin(carPh + Math.sin(modPh) * modIdx);
-    carPh += carInc; modPh += modInc;
+    const modIdx = 2.8 * Math.exp(-5.5 * t);          // 2.8 → ~0 (bright → warm)
+    const att    = t < 0.006 ? t / 0.006 : 1.0;       // 6 ms attack
+    const env    = att * Math.exp(-1.6 * t);
+    d[i] = env * Math.sin(carPh + modIdx * Math.sin(modPh));
+    carPh += carInc; if (carPh > 6.2832) carPh -= 6.2832;
+    modPh += modInc; if (modPh > 6.2832) modPh -= 6.2832;
   }
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.82;
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] /= pk * 1.10;
   return buf;
 }
 
-function computeRhodesBuffer(ac, freq, dur = 1.6) {
-  // FM electric piano: carrier + decaying modulator → bell-like attack, warm sustain
+// FM Rhodes — correct modulation index (1.8 at onset, sustains at ~0.18)
+// Models DX7 electric piano algorithm: carrier + decaying FM modulator
+function computeRhodesBuffer(ac, freq, dur = 2.2) {
   const sr = ac.sampleRate;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
   const d = buf.getChannelData(0);
   let carPh = 0, modPh = 0;
-  const carInc = 2*Math.PI*freq/sr;
-  const modInc = 2*Math.PI*freq/sr;
+  const carInc = 2 * Math.PI * freq / sr;
+  const modInc = 2 * Math.PI * freq / sr;  // 1:1
   for (let i = 0; i < len; i++) {
     const t = i / sr;
-    const modIdx = freq * 3.2 * Math.exp(-5.8 * t);
-    const amp    = 0.18 * Math.exp(-2.2 * t) + 0.82 * Math.exp(-0.14 * t);
-    const h2     = Math.sin(carPh * 2) * 0.10 * Math.exp(-4.5 * t);
-    d[i] = amp * (Math.sin(carPh + Math.sin(modPh) * modIdx) * 0.90 + h2);
-    carPh += carInc; modPh += modInc;
+    const modIdx = 1.8 * Math.exp(-2.5 * t) + 0.18;  // sustains at 0.18 for warmth
+    const att    = t < 0.010 ? t / 0.010 : 1.0;       // 10 ms attack
+    const env    = att * (0.12 * Math.exp(-5 * t) + 0.88 * Math.exp(-0.22 * t));
+    d[i] = env * Math.sin(carPh + modIdx * Math.sin(modPh));
+    carPh += carInc; if (carPh > 6.2832) carPh -= 6.2832;
+    modPh += modInc; if (modPh > 6.2832) modPh -= 6.2832;
   }
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.70;
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] /= pk * 1.10;
   return buf;
 }
 
-// ── Music track definitions ─────────────────────────────────────────────────
-// Full C-major JI scale for music mode (F and B are allowed here — this is music, not therapy)
+// ── Music data ──────────────────────────────────────────────────────────────
+
+// JI note frequencies (C4 = 264 Hz root)
 const MU = {
-  C2:66, F2:88, G2:99, A2:110, B2:123.75,
+  C2:66,  F2:88,  G2:99,  A2:110, B2:123.75,
   C3:132, D3:148.5, E3:165, F3:176, G3:198, A3:220, B3:247.5,
   C4:264, D4:297, E4:330, F4:352, G4:396, A4:440, B4:495,
   C5:528, E5:660, G5:792,
 };
 
-// Chord voicings: bass root + Rhodes pad tones + pentatonic melody pool
+// Chord voicings: bass root + Rhodes pad tones + melody pool
 const MCHORDS = {
-  Cmaj7: { bass:MU.C3, pads:[MU.C4,MU.E4,MU.G4,MU.B4],  melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
-  Am7:   { bass:MU.A2, pads:[MU.A3,MU.C4,MU.E4,MU.G4],  melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
-  Fmaj7: { bass:MU.F2, pads:[MU.F3,MU.A3,MU.C4,MU.E4],  melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
-  G7:    { bass:MU.G2, pads:[MU.G3,MU.B3,MU.D4,MU.F4],  melo:[MU.G3,MU.B3,MU.D4,MU.G4,MU.A4] },
-  Am:    { bass:MU.A2, pads:[MU.A3,MU.C4,MU.E4],         melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
-  F:     { bass:MU.F2, pads:[MU.F3,MU.A3,MU.C4],         melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
-  C:     { bass:MU.C3, pads:[MU.C4,MU.E4,MU.G4],         melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
-  G:     { bass:MU.G2, pads:[MU.G3,MU.B3,MU.D4],         melo:[MU.G3,MU.B3,MU.D4,MU.G4,MU.A4] },
+  Cmaj7: { bass:MU.C2, pads:[MU.E4,MU.G4,MU.B4,MU.C5], melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
+  Am7:   { bass:MU.A2, pads:[MU.C4,MU.E4,MU.G4,MU.A4], melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
+  Fmaj7: { bass:MU.F2, pads:[MU.A3,MU.C4,MU.E4,MU.F4], melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
+  G7:    { bass:MU.G2, pads:[MU.B3,MU.D4,MU.F4,MU.G4], melo:[MU.G3,MU.B3,MU.D4,MU.F4,MU.G4] },
+  Am:    { bass:MU.A2, pads:[MU.C4,MU.E4,MU.A4],        melo:[MU.A3,MU.C4,MU.E4,MU.G4,MU.A4] },
+  F:     { bass:MU.F2, pads:[MU.A3,MU.C4,MU.F4],        melo:[MU.F3,MU.A3,MU.C4,MU.E4,MU.F4] },
+  C:     { bass:MU.C2, pads:[MU.E4,MU.G4,MU.C5],        melo:[MU.C4,MU.E4,MU.G4,MU.A4,MU.C5] },
+  G:     { bass:MU.G2, pads:[MU.B3,MU.D4,MU.G4],        melo:[MU.G3,MU.B3,MU.D4,MU.G4,MU.A4] },
 };
 
-// 16-step (16th-note) drum patterns per bar
+// 16-step drum patterns (16th notes per bar)
 const DRUM_PATTERNS = {
   boomBap:   { k:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0], s:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], h:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0] },
   minimal:   { k:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], s:[0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0], h:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0] },
   fourFloor: { k:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], s:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], h:[1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,0] },
 };
 
+// Bass line patterns — 16 steps, value = multiplier on chord.bass (0 = rest)
+// 1 = root, 1.5 = fifth (adds walking character), 2 = octave
+const BASS_LINES = {
+  Cmaj7: [1,0,0,0, 0,0,0,0, 1,0,0,0, 1.5,0,0,0],
+  Am7:   [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,  0,0,0],
+  Fmaj7: [1,0,0,0, 0,0,0,0, 1,0,0,0, 1.5,0,0,0],
+  G7:    [1,0,0,0, 0,0,1.5,0, 1,0,0,0, 1.5,0,0,0],
+  Am:    [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,  0,0,0],
+  F:     [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,  0,0,0],
+  C:     [1,0,0,0, 0,0,0,0, 1,0,0,0, 1.5,0,0,0],
+  G:     [1,0,0,0, 0,0,1.5,0, 1,0,0,0, 0,  0,0,0],
+};
+
+// Rhodes comping steps per track
+// Steps where Rhodes chord is triggered (0=beat1, 4=beat2, 8=beat3, 12=beat4)
 const MUSIC_TRACKS = [
   {
     id: 'cafe', name: 'Café Morning', icon: '☕',
     sub: 'コーヒーを飲みながら、朝をゆっくり過ごす',
     bpm: 87, drumPat: 'boomBap', barsPerChord: 4,
     prog: ['Cmaj7','Am7','Fmaj7','G7'],
-    rhodesSteps:[2,10], rhodesNotes: 3,   // off-beat comping
-    bassSteps:  [0,10], melodChance: 0.28,
-    vol: { k:0.52, s:0.36, h:0.20, bass:0.44, rhodes:0.30, melo:0.18 },
+    rhodesSteps: [2, 10],   // off-beat "and" comping
+    rhodesNotes: 3,
+    melodChance: 0.30,
+    vol: { k:0.52, s:0.38, h:0.18, bass:0.46, rhodes:0.32, melo:0.22, pad:0.05 },
   },
   {
     id: 'evening', name: 'Evening', icon: '🌙',
     sub: '夜、窓の外を眺めながら',
-    bpm: 75, drumPat: 'minimal', barsPerChord: 8,
+    bpm: 76, drumPat: 'minimal', barsPerChord: 8,
     prog: ['Am7','Fmaj7','Cmaj7','G7'],
-    rhodesSteps:[0,8], rhodesNotes: 4,   // full chord, held
-    bassSteps:  [0],   melodChance: 0.20,
-    vol: { k:0.28, s:0.16, h:0.12, bass:0.36, rhodes:0.38, melo:0.26 },
+    rhodesSteps: [0, 8],    // on the beat, long sustain
+    rhodesNotes: 4,
+    melodChance: 0.18,
+    vol: { k:0.26, s:0.16, h:0.10, bass:0.36, rhodes:0.40, melo:0.24, pad:0.07 },
   },
   {
     id: 'flow', name: 'Flow', icon: '🌿',
     sub: '歩きながら、自然のリズムで',
     bpm: 96, drumPat: 'fourFloor', barsPerChord: 4,
     prog: ['C','G','Am','F'],
-    rhodesSteps:[2,6,10,14], rhodesNotes: 2,  // staccato stabs
-    bassSteps:  [0,8,12],    melodChance: 0.36,
-    vol: { k:0.58, s:0.42, h:0.24, bass:0.50, rhodes:0.24, melo:0.20 },
+    rhodesSteps: [2, 6, 10, 14],  // staccato stabs on every beat-and
+    rhodesNotes: 2,
+    melodChance: 0.38,
+    vol: { k:0.56, s:0.44, h:0.22, bass:0.50, rhodes:0.26, melo:0.22, pad:0.04 },
   },
 ];
 
 // ── NagiMusic class ─────────────────────────────────────────────────────────
 class NagiMusic {
   constructor() {
-    this.ac = null;
-    this.masterGain = null;
-    this.trackGain  = null;
-    this.isPlaying  = false;
-    this.trackIdx   = 0;
-    this.step       = 0;    // 16th-note step within bar
-    this.bar        = 0;    // bar index (resets on chord cycle)
-    this.totalBars  = 0;    // lifetime bar count for transition timing
-    this._tmr       = null;
+    this.ac            = null;
+    this.masterGain    = null;
+    this.trackGain     = null;
+    this.isPlaying     = false;
+    this.trackIdx      = 0;
+    this._step         = 0;        // 0-15 within current bar
+    this._bar          = 0;        // bars elapsed in current chord cycle
+    this._totalBars    = 0;        // lifetime bar counter for transition trigger
+    this._nextStepTime = 0;        // AudioContext time of next scheduled step
+    this._schedTmr     = null;
     this._transitioning = false;
-    this._BARS_PER_SWITCH = 40;   // ~3 min at BPM 87
-    this._kickBuf   = null;
-    this._snareBuf  = null;
-    this._hatBuf    = null;
-    this._ohatBuf   = null;
-    this._visRaf    = null;
-    this._analyser  = null;
-    this._audioEl   = null;
+    this._BARS_PER_SWITCH = 40;    // ~2-3 min depending on BPM
+
+    // Drum buffers (pre-rendered once)
+    this._kickBuf  = null;
+    this._snareBuf = null;
+    this._hatBuf   = null;
+    this._ohatBuf  = null;
+
+    // Note buffer caches (pre-rendered per frequency)
+    this._bassBufs   = new Map();  // freq → AudioBuffer
+    this._rhodesBufs = new Map();  // freq → AudioBuffer
+
+    // Sustaining sine pad (oscillator nodes, one per chord tone)
+    this._padNodes = [];           // [{osc, gain}]
+
+    // Melody continuity
+    this._lastMeloFreq = null;
+
+    // Visualizer / iOS
+    this._analyser = null;
+    this._visRaf   = null;
+    this._audioEl  = null;
   }
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // ── Public API ──────────────────────────────────────────────────────────────
 
   open(healingApp) {
-    // Pause healing sounds while music is open
     if (healingApp && healingApp.isPlaying) healingApp._pause();
-
     const screen = document.getElementById('music-screen');
     screen.classList.add('active');
     requestAnimationFrame(() => screen.classList.add('visible'));
-
     if (!this.isPlaying) this._startEngine();
     this._startVis();
     this._updateUI();
@@ -5457,13 +5504,17 @@ class NagiMusic {
 
   stopEngine() {
     this.isPlaying = false;
-    if (this._tmr) { clearTimeout(this._tmr); this._tmr = null; }
+    if (this._schedTmr) { clearTimeout(this._schedTmr); this._schedTmr = null; }
+    this._stopPad();
     if (this.masterGain && this.ac) {
       this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.6);
       setTimeout(() => { try { this.ac.close(); } catch(_){} this.ac = null; }, 3000);
     }
     this._stopVis();
-    if (this._audioEl) { try { this._audioEl.pause(); this._audioEl.remove(); } catch(_){} this._audioEl = null; }
+    if (this._audioEl) {
+      try { this._audioEl.pause(); this._audioEl.remove(); } catch(_){}
+      this._audioEl = null;
+    }
   }
 
   skipTrack() {
@@ -5472,15 +5523,17 @@ class NagiMusic {
   }
 
   setVol(v) {
-    if (this.masterGain && this.ac) this.masterGain.gain.setTargetAtTime(v, this.ac.currentTime, 0.1);
+    if (this.masterGain && this.ac)
+      this.masterGain.gain.setTargetAtTime(v, this.ac.currentTime, 0.1);
   }
 
-  // ── Audio engine ───────────────────────────────────────────────────────────
+  // ── Audio engine ────────────────────────────────────────────────────────────
 
   _startEngine() {
     this.ac = new (window.AudioContext || window.webkitAudioContext)();
     if (this.ac.state === 'suspended') this.ac.resume();
 
+    // Graph: trackGain → masterGain → analyser → destination
     this._analyser = this.ac.createAnalyser();
     this._analyser.fftSize = 512;
     this._analyser.smoothingTimeConstant = 0.82;
@@ -5490,151 +5543,283 @@ class NagiMusic {
     this.masterGain.connect(this._analyser);
     this._analyser.connect(this.ac.destination);
 
-    // iOS mute-switch bypass
+    // iOS mute-switch bypass via MediaStreamDestination
     if (/iP(hone|ad|od)/.test(navigator.userAgent) && this.ac.createMediaStreamDestination) {
       try {
         const dest = this.ac.createMediaStreamDestination();
         this.masterGain.connect(dest);
         const el = document.createElement('audio');
-        el.setAttribute('playsinline',''); el.srcObject = dest.stream;
-        el.play().catch(()=>{});
-        document.body.appendChild(el); this._audioEl = el;
-      } catch(_){}
+        el.setAttribute('playsinline', '');
+        el.srcObject = dest.stream;
+        el.play().catch(() => {});
+        document.body.appendChild(el);
+        this._audioEl = el;
+      } catch (_) {}
     }
 
     this.trackGain = this.ac.createGain();
     this.trackGain.gain.value = 1;
     this.trackGain.connect(this.masterGain);
 
-    // Pre-render drum buffers once
+    // Pre-render all buffers before first tick
     this._kickBuf  = computeKickBuffer(this.ac);
     this._snareBuf = computeSnareBuffer(this.ac);
     this._hatBuf   = computeHihatBuffer(this.ac, false);
     this._ohatBuf  = computeHihatBuffer(this.ac, true);
+    this._prerenderNotes();
 
     // Fade in
     const vol = (+document.getElementById('ms-vol').value) / 100;
     this.masterGain.gain.setTargetAtTime(vol, this.ac.currentTime, 1.2);
 
+    // Start sustaining pad on first chord
+    this._startPad();
+
+    // Launch lookahead scheduler
     this.isPlaying = true;
-    this.step = this.bar = this.totalBars = 0;
-    this._tick();
+    this._step = this._bar = this._totalBars = 0;
+    this._lastMeloFreq = null;
+    this._nextStepTime = this.ac.currentTime + 0.10;
+    this._scheduler();
   }
 
-  _tick() {
-    if (!this.isPlaying) return;
+  // Pre-render all bass and Rhodes buffers used across every track
+  _prerenderNotes() {
+    const bassFreqs   = new Set();
+    const rhodesFreqs = new Set();
 
-    const track   = MUSIC_TRACKS[this.trackIdx];
-    const drum    = DRUM_PATTERNS[track.drumPat];
-    const si      = this.step % 16;                               // step-in-bar 0-15
-    const cycleLen = track.barsPerChord * track.prog.length;      // total bars per chord cycle
-    const chordIdx = Math.floor((this.bar % cycleLen) / track.barsPerChord) % track.prog.length;
-    const chord   = MCHORDS[track.prog[chordIdx]];
-    const when    = this.ac.currentTime;
-    const barsLeft = this._BARS_PER_SWITCH - this.totalBars;
+    MUSIC_TRACKS.forEach(t => {
+      t.prog.forEach(chName => {
+        const ch = MCHORDS[chName];
+        // Bass: root + fifth
+        bassFreqs.add(ch.bass);
+        bassFreqs.add(+(ch.bass * 1.5).toFixed(2));
+        // Rhodes: all pad tones
+        ch.pads.forEach(f => rhodesFreqs.add(f));
+      });
+    });
 
-    // ── Drums (muted when very close to transition for DJ effect) ──────────
+    bassFreqs.forEach(f   => this._bassBufs.set(f,   computeFMBassBuffer(this.ac, f)));
+    rhodesFreqs.forEach(f => this._rhodesBufs.set(f, computeRhodesBuffer(this.ac, f)));
+  }
+
+  _getBassBuffer(freq) {
+    let best = null, bestDiff = Infinity;
+    for (const [f, buf] of this._bassBufs) {
+      const d = Math.abs(f - freq);
+      if (d < bestDiff) { bestDiff = d; best = buf; }
+    }
+    if (bestDiff < 4) return best;
+    // Fallback: compute on-the-fly and cache
+    const buf = computeFMBassBuffer(this.ac, freq);
+    this._bassBufs.set(freq, buf);
+    return buf;
+  }
+
+  _getRhodesBuffer(freq) {
+    let best = null, bestDiff = Infinity;
+    for (const [f, buf] of this._rhodesBufs) {
+      const d = Math.abs(f - freq);
+      if (d < bestDiff) { bestDiff = d; best = buf; }
+    }
+    if (bestDiff < 4) return best;
+    const buf = computeRhodesBuffer(this.ac, freq);
+    this._rhodesBufs.set(freq, buf);
+    return buf;
+  }
+
+  // ── Sustaining pad (sine oscillators on chord tones) ────────────────────────
+
+  _startPad() {
+    const track = MUSIC_TRACKS[this.trackIdx];
+    const chord = MCHORDS[track.prog[0]];
+    // Two sine oscillators: bottom two pad tones, very soft
+    const freqs = chord.pads.slice(0, 2);
+    this._padNodes = freqs.map((freq, i) => {
+      const osc = this.ac.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const g = this.ac.createGain();
+      g.gain.value = track.vol.pad * (i === 0 ? 1.0 : 0.65);
+      osc.connect(g);
+      g.connect(this.trackGain);
+      osc.start();
+      return { osc, gain: g };
+    });
+  }
+
+  _updatePad(chord, vol, when) {
+    const freqs = chord.pads.slice(0, 2);
+    this._padNodes.forEach(({ osc, gain }, i) => {
+      if (freqs[i]) {
+        osc.frequency.setValueAtTime(freqs[i], when);
+        gain.gain.setTargetAtTime(vol * (i === 0 ? 1.0 : 0.65), when, 0.05);
+      }
+    });
+  }
+
+  _stopPad() {
+    if (!this.ac) return;
+    this._padNodes.forEach(({ osc, gain }) => {
+      try {
+        gain.gain.setTargetAtTime(0, this.ac.currentTime, 0.3);
+        osc.stop(this.ac.currentTime + 1.5);
+      } catch (_) {}
+    });
+    this._padNodes = [];
+  }
+
+  // ── Lookahead scheduler (Chris Wilson pattern) ───────────────────────────────
+  //  Runs every 50 ms; schedules any steps that fall within the next 150 ms.
+  //  This gives sample-accurate timing with zero drift — the AudioContext clock
+  //  drives all note start times, not setTimeout intervals.
+
+  _scheduler() {
+    if (!this.isPlaying || !this.ac) return;
+    const LOOKAHEAD = 0.15;  // 150 ms window
+    const track    = MUSIC_TRACKS[this.trackIdx];
+    const stepDur  = 60.0 / track.bpm / 4.0;  // 16th-note duration in seconds
+
+    while (this._nextStepTime < this.ac.currentTime + LOOKAHEAD) {
+      this._scheduleStep(this._nextStepTime);
+      this._nextStepTime += stepDur;
+      this._advanceStep();
+    }
+
+    this._schedTmr = setTimeout(() => this._scheduler(), 50);
+  }
+
+  _scheduleStep(when) {
+    if (!this.isPlaying || !this.ac) return;
+    const track    = MUSIC_TRACKS[this.trackIdx];
+    const drum     = DRUM_PATTERNS[track.drumPat];
+    const si       = this._step;
+    const cycleLen = track.barsPerChord * track.prog.length;
+    const barInCy  = this._bar % cycleLen;
+    const chordIdx = Math.floor(barInCy / track.barsPerChord) % track.prog.length;
+    const chName   = track.prog[chordIdx];
+    const chord    = MCHORDS[chName];
+    const barsLeft = this._BARS_PER_SWITCH - this._totalBars;
+
+    // ── Drums (fade out 2 bars before transition for DJ effect) ────────────
     const drumVol = barsLeft <= 2 ? Math.max(0, barsLeft / 2) : 1.0;
-    if (drum.k[si]) this._pb(this._kickBuf,  when, track.vol.k  * drumVol * (0.88 + Math.random()*0.12));
-    if (drum.s[si]) this._pb(this._snareBuf, when, track.vol.s  * drumVol * (0.82 + Math.random()*0.18));
+    if (drum.k[si]) this._pb(this._kickBuf,  when, track.vol.k * drumVol);
+    if (drum.s[si]) this._pb(this._snareBuf, when, track.vol.s * drumVol);
     if (drum.h[si]) {
       const useOpen = (si === 14 && Math.random() < 0.25);
       this._pb(useOpen ? this._ohatBuf : this._hatBuf,
-               when, track.vol.h * (0.55 + Math.random()*0.45));
+               when, track.vol.h * (0.55 + Math.random() * 0.45));
     }
 
-    // ── Bass ───────────────────────────────────────────────────────────────
-    if (track.bassSteps.includes(si)) {
-      const bassF = si === 0 ? chord.bass : chord.bass * (Math.random() < 0.5 ? 1.5 : 1.0);
-      const buf = computeFMBassBuffer(this.ac, bassF, 0.45 + Math.random()*0.2);
-      this._pb(buf, when, track.vol.bass * (0.75 + Math.random()*0.25));
+    // ── Bass (from BASS_LINES pattern) ──────────────────────────────────────
+    const bassLine = BASS_LINES[chName] || BASS_LINES['C'];
+    if (bassLine[si]) {
+      const bassFreq = chord.bass * bassLine[si];
+      this._pb(this._getBassBuffer(bassFreq), when, track.vol.bass);
     }
 
-    // ── Rhodes (electric piano chord comping) ──────────────────────────────
+    // ── Pad update on bar start ──────────────────────────────────────────────
+    if (si === 0) {
+      this._updatePad(chord, track.vol.pad, when);
+    }
+
+    // ── Rhodes comping ───────────────────────────────────────────────────────
     if (track.rhodesSteps.includes(si)) {
-      const pads = chord.pads.slice(-track.rhodesNotes);  // top N notes
-      pads.forEach((freq, pi) => {
-        const v = track.vol.rhodes * (0.55 + Math.random()*0.30) * (pi === 0 ? 1 : 0.72);
-        const dur = 0.7 + Math.random()*0.6;
-        const buf = computeRhodesBuffer(this.ac, freq, dur);
-        this._pb(buf, when + pi * 0.010, v);  // subtle strum spread
+      // Inner voicing: skip lowest pad note to avoid muddiness
+      const pads    = chord.pads;
+      const start   = pads.length >= 4 ? 1 : 0;
+      const voicing = pads.slice(start, start + track.rhodesNotes);
+      voicing.forEach((freq, i) => {
+        const buf = this._getRhodesBuffer(freq);
+        this._pb(buf, when + i * 0.012,
+                 track.vol.rhodes * (i === 0 ? 1.0 : 0.72));
       });
     }
 
-    // ── Melody (piano, sparse, pentatonic over chord) ──────────────────────
+    // ── Melody (piano, sparse, stepwise random-walk) ─────────────────────────
     if (si % 4 === 0 && Math.random() < track.melodChance) {
-      const pool = chord.melo;
-      const freq = pool[Math.floor(Math.random() * pool.length)];
-      const dur  = 0.55 + Math.random()*0.75;
-      const v    = track.vol.melo * (0.50 + Math.random()*0.42);
-      this._pb(computePianoBuffer(this.ac, freq, v, dur), when, 1.0);
+      const freq = this._nextMeloNote(chord);
+      // computePianoBuffer is a module-level function defined in the healing section
+      const buf  = computePianoBuffer(this.ac, freq, track.vol.melo * 0.55, 1.6);
+      this._pb(buf, when, 1.0);
     }
+  }
 
-    // ── Advance step / bar counters ────────────────────────────────────────
-    this.step++;
-    if (this.step % 16 === 0) {
-      this.bar++;
-      this.totalBars++;
+  _advanceStep() {
+    this._step = (this._step + 1) % 16;
+    if (this._step === 0) {
+      this._bar++;
+      this._totalBars++;
 
-      // Update progress bar (position in current chord cycle)
-      const pct = (this.bar % cycleLen) / cycleLen * 100;
-      const fill = document.getElementById('ms-progress-fill');
+      const track    = MUSIC_TRACKS[this.trackIdx];
+      const cycleLen = track.barsPerChord * track.prog.length;
+      const pct      = (this._bar % cycleLen) / cycleLen * 100;
+      const fill     = document.getElementById('ms-progress-fill');
       if (fill) fill.style.width = pct + '%';
 
-      // 4-bar countdown: add open hats for DJ tension
-      if (barsLeft <= 4 && barsLeft > 0 && !this._transitioning) {
-        // done in next tick via drumVol muting above
-      }
-
-      // Trigger transition
-      if (!this._transitioning && this.totalBars >= this._BARS_PER_SWITCH) {
+      if (!this._transitioning && this._totalBars >= this._BARS_PER_SWITCH) {
         this._beginTransition(false);
       }
     }
+  }
 
-    // Schedule next 16th-note tick with slight human feel
-    const ms = (60 / track.bpm / 4) * 1000 * (0.985 + Math.random()*0.030);
-    this._tmr = setTimeout(() => this._tick(), ms);
+  // Stepwise melody: prefer notes within a minor third of the previous note
+  _nextMeloNote(chord) {
+    const pool = chord.melo;
+    if (!this._lastMeloFreq) {
+      this._lastMeloFreq = pool[Math.floor(pool.length / 2)];
+      return this._lastMeloFreq;
+    }
+    // Collect "close" notes (ratio within ~1.14 = minor second/third range)
+    const close = pool.filter(f => {
+      const r = f / this._lastMeloFreq;
+      return r > 0.87 && r < 1.15;
+    });
+    const candidates = close.length >= 2 ? close : pool;
+    this._lastMeloFreq = candidates[Math.floor(Math.random() * candidates.length)];
+    return this._lastMeloFreq;
   }
 
   _pb(buf, when, vol) {
-    if (!this.ac || !this.trackGain) return;
+    if (!this.ac || !this.trackGain || !buf) return;
     try {
       const src = this.ac.createBufferSource();
       src.buffer = buf;
       const g = this.ac.createGain();
       g.gain.value = Math.max(0, Math.min(1, vol));
-      src.connect(g); g.connect(this.trackGain);
+      src.connect(g);
+      g.connect(this.trackGain);
       src.start(when);
-      src.stop(when + buf.duration + 0.15);
-    } catch(_) {}
+      src.stop(when + buf.duration + 0.05);
+    } catch (_) {}
   }
 
-  // ── DJ-style transition ────────────────────────────────────────────────────
+  // ── DJ-style transition ──────────────────────────────────────────────────────
+
   _beginTransition(immediate) {
     if (this._transitioning) return;
     this._transitioning = true;
 
-    const bpm = MUSIC_TRACKS[this.trackIdx].bpm;
-    // Fade duration: immediate skip = 2.5 s, auto = 4 bars in current BPM
-    const fadeSec = immediate ? 2.5 : (4 * 4 * (60 / bpm));
+    const bpm     = MUSIC_TRACKS[this.trackIdx].bpm;
+    const fadeSec = immediate ? 2.5 : (4 * 4 * (60 / bpm));  // 2.5 s or 4 bars
 
-    // Announce transition in UI
     const sub = document.getElementById('ms-track-sub');
     if (sub) sub.textContent = '次のトラックへ...';
 
-    // Fade out current track gain
     this.trackGain.gain.setTargetAtTime(0, this.ac.currentTime, fadeSec / 3.5);
 
     setTimeout(() => {
-      // Switch track, reset counters
-      this.trackIdx    = (this.trackIdx + 1) % MUSIC_TRACKS.length;
-      this.step        = 0;
-      this.bar         = 0;
-      this.totalBars   = 0;
+      this.trackIdx      = (this.trackIdx + 1) % MUSIC_TRACKS.length;
+      this._step         = 0;
+      this._bar          = 0;
+      this._totalBars    = 0;
+      this._lastMeloFreq = null;
       this._transitioning = false;
 
-      // Fade new track in
+      // Restart pad for new track's first chord
+      this._stopPad();
+      this._startPad();
+
       this.trackGain.gain.cancelScheduledValues(this.ac.currentTime);
       this.trackGain.gain.setValueAtTime(0, this.ac.currentTime);
       this.trackGain.gain.setTargetAtTime(1, this.ac.currentTime, 2.2);
@@ -5643,9 +5828,10 @@ class NagiMusic {
     }, fadeSec * 1000);
   }
 
-  // ── UI helpers ─────────────────────────────────────────────────────────────
+  // ── UI helpers ───────────────────────────────────────────────────────────────
+
   _updateUI() {
-    const t = MUSIC_TRACKS[this.trackIdx];
+    const t    = MUSIC_TRACKS[this.trackIdx];
     const icon = document.getElementById('ms-track-icon');
     const name = document.getElementById('ms-track-name');
     const sub  = document.getElementById('ms-track-sub');
@@ -5656,11 +5842,12 @@ class NagiMusic {
     if (fill) { fill.style.transition = 'none'; fill.style.width = '0%'; }
   }
 
-  // ── Spectrum visualiser ────────────────────────────────────────────────────
+  // ── Spectrum visualizer ──────────────────────────────────────────────────────
+
   _startVis() {
     const canvas = document.getElementById('ms-canvas');
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx  = canvas.getContext('2d');
     const bars = 52;
     const smooth = new Float32Array(bars).fill(0);
 
@@ -5668,7 +5855,6 @@ class NagiMusic {
       this._visRaf = requestAnimationFrame(draw);
       const W = canvas.width  = canvas.clientWidth;
       const H = canvas.height = canvas.clientHeight;
-
       ctx.clearRect(0, 0, W, H);
 
       let freqData = null;
@@ -5682,14 +5868,12 @@ class NagiMusic {
       for (let i = 0; i < bars; i++) {
         const raw = freqData
           ? (freqData[Math.floor(i * freqData.length / bars / 1.8)] / 255)
-          : (Math.sin(Date.now()/1800 + i*0.38)*0.5+0.5) * 0.07;  // idle wave
-
+          : (Math.sin(Date.now() / 1800 + i * 0.38) * 0.5 + 0.5) * 0.07;
         smooth[i] += (raw - smooth[i]) * 0.18;
-        const h = smooth[i] * H * 0.60;
-        const x = i * (W / bars);
+        const h     = smooth[i] * H * 0.60;
+        const x     = i * (W / bars);
         const alpha = 0.14 + smooth[i] * 0.42;
-        // Gradient fill: blue at bottom, purple at peak
-        const grad = ctx.createLinearGradient(0, H, 0, H - h);
+        const grad  = ctx.createLinearGradient(0, H, 0, H - h);
         grad.addColorStop(0, `rgba(56,189,248,${alpha})`);
         grad.addColorStop(1, `rgba(167,139,250,${alpha * 0.7})`);
         ctx.fillStyle = grad;
