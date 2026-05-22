@@ -237,6 +237,70 @@ function computeGlockBuffer(ac, freq, velocity = 0.7, durationSec = 3.8) {
   return buf;
 }
 
+// Crystal singing bowl (クリスタルボウル) — pure quartz glass, rim-struck or played
+// with a leather mallet. Produces near-pure harmonics with very long sustain and
+// a characteristic gentle amplitude waviness ("singing" quality of quartz resonance).
+//
+// Overtone ratios: spherical shell modes slightly sharper than integer multiples.
+//   Mode 0: 1.000 (fundamental)   — dominant, very slow decay
+//   Mode 1: 2.003 (1st overtone)  — rich presence
+//   Mode 2: 3.012 (2nd overtone)  — shimmer
+//   Mode 3: 4.030 (3rd overtone)  — airy top
+//
+// AM modulation 1.6–3.5 Hz: the characteristic waviness of rim contact.
+// Slow FM wobble 0.35–0.55 Hz ±0.4 cents: bowl spinning slowly.
+//
+// 倍音浴 (overtone bath): multiple overlapping bowl tones fill the listening space
+// with a rich harmonic series that induces parasympathetic relaxation and sleep.
+function computeCrystalBowlBuffer(ac, freq, durationSec = 18.0) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * durationSec);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+
+  // [ratio, amplitude, decay_1/s, am_rate_Hz, am_depth]
+  const modes = [
+    [1.000, 0.62, 0.014, 1.6, 0.055],  // fundamental  — τ ≈ 70 s; barely decays in 18 s
+    [2.003, 0.24, 0.052, 2.2, 0.044],  // 1st overtone — clear, rich
+    [3.012, 0.09, 0.140, 2.8, 0.033],  // 2nd overtone — shimmer
+    [4.030, 0.03, 0.340, 3.5, 0.022],  // 3rd overtone — air at the attack
+  ];
+
+  const phi      = Math.random() * Math.PI * 2;
+  const spinRate = 0.35 + Math.random() * 0.20;   // 0.35–0.55 Hz slow spin
+  const spinAmt  = freq * 0.00023;                 // ±0.4 cents frequency wobble
+
+  for (let i = 0; i < len; i++) {
+    const t      = i / sr;
+    const spinHz = spinAmt * Math.sin(2 * Math.PI * spinRate * t);
+    let s = 0;
+
+    modes.forEach(([ratio, amp, dc, amRate, amDep]) => {
+      const f = (freq + spinHz) * ratio;
+      if (f >= sr * 0.45) return;
+      const am = 1.0 + amDep * Math.sin(2 * Math.PI * amRate * t + phi * ratio);
+      s += amp * Math.exp(-dc * t) * am * Math.sin(2 * Math.PI * f * t + phi);
+    });
+
+    d[i] = s;
+  }
+
+  // Normalize with 2 s linear attack + 4 s linear fade-out for smooth overlaps
+  let peak = 0;
+  for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
+  if (peak > 0.01) {
+    const attLen = Math.min(Math.round(sr * 2.0), len);
+    const relLen = Math.min(Math.round(sr * 4.0), len);
+    for (let i = 0; i < len; i++) {
+      let env = 1.0;
+      if (i < attLen)        env = i / attLen;
+      if (i > len - relLen)  env = (len - i) / relLen;
+      d[i] = (d[i] / peak * 0.78) * env;
+    }
+  }
+  return buf;
+}
+
 // Music box (オルゴール) — cantilever beam tine, plucked by a rotating pin
 // Cantilever overtone ratios: 1.000, 6.267, 17.55 (far more inharmonic than glockenspiel)
 // Result: mostly fundamental sustain; overtones vanish in milliseconds → delicate, intimate
@@ -642,16 +706,10 @@ const PRESETS = {
               [_.G4, _.E4, _.C4, _.G4, _.C4, _.E4, _.C4, _.G4],  // P3: G4↔C4 dialogue
               [_.E4, _.C4, _.E4, _.G4, _.E4, _.G4, _.C4, _.E4],  // P4: E4-center, climbing to G4
             ], bpm:77, startDelay:8, vol:0.28 },
-          { type:'glock',     name:'鉄琴',         icon:'🎵',
-            // Simplified to root (C4), perfect-5th (G4), and upper octave (C5=solfeggio).
-            // These 3 notes are ALWAYS consonant with any C/E/G guitar note,
-            // eliminating harmonic clashes regardless of BPM drift between instruments.
-            patterns:[
-              [_.G4, null, _.C4, null, _.G4, null, _.C4, null],  // P1: G4-C4 alternation
-              [_.C4, null, _.G4, null, _.C4, null, _.G4, null],  // P2: C4-G4 alternation
-              [_.G4, null, _.C5, null, _.G4, null, _.C4, null],  // P3: C5 sparkle (solfeggio)
-              [_.C4, null, _.G4, null, _.C5, null, _.G4, null],  // P4: ascending C4→G4→C5
-            ], bpm:77, startDelay:16, vol:0.20 },
+          { type:'crystal',   name:'クリスタルボウル', icon:'🔮',
+            // C4→G4→C5: root, perfect 5th, octave — always consonant with guitar/piano.
+            // Long sustained tones overlap to create 倍音浴 (overtone bath) for sleep.
+            freqs:[_.C4, _.G4, _.C5], interval:18000, startDelay:14, vol:0.26 },
           { type:'orgol',     name:'オルゴール',         icon:'🎶',
             // E5=660Hz removed: glock's 2nd inharmonic mode of C4 (264×2.756=727Hz)
             // sits only 67Hz from E5, inside the critical bandwidth → roughness.
@@ -689,13 +747,8 @@ const PRESETS = {
               [_.G4, _.E4, _.C4, _.G4, _.C4, _.E4, _.C4, _.G4],
               [_.E4, _.C4, _.E4, _.G4, _.E4, _.G4, _.C4, _.E4],
             ], bpm:77, startDelay:8, vol:0.28 },
-          { type:'glock',     name:'鉄琴',          icon:'🎵',
-            patterns:[
-              [_.G4, null, _.C4, null, _.G4, null, _.C4, null],
-              [_.C4, null, _.G4, null, _.C4, null, _.G4, null],
-              [_.G4, null, _.C5, null, _.G4, null, _.C4, null],
-              [_.C4, null, _.G4, null, _.C5, null, _.G4, null],
-            ], bpm:77, startDelay:16, vol:0.20 },
+          { type:'crystal',   name:'クリスタルボウル', icon:'🔮',
+            freqs:[_.C4, _.G4, _.C5], interval:18000, startDelay:14, vol:0.26 },
           { type:'orgol',     name:'オルゴール',          icon:'🎶',
             patterns:[
               [_.C5, null, null, null, _.G4, null, null, null],
@@ -723,13 +776,8 @@ const PRESETS = {
               [_.G4, _.E4, _.C4, _.G4, _.C4, _.E4, _.C4, _.G4],
               [_.E4, _.C4, _.E4, _.G4, _.E4, _.G4, _.C4, _.E4],
             ], bpm:77, startDelay:12, vol:0.24 },
-          { type:'glock',    name:'鉄琴',           icon:'🎵',
-            patterns:[
-              [_.G4, null, _.C4, null, _.G4, null, _.C4, null],
-              [_.C4, null, _.G4, null, _.C4, null, _.G4, null],
-              [_.G4, null, _.C5, null, _.G4, null, _.C4, null],
-              [_.C4, null, _.G4, null, _.C5, null, _.G4, null],
-            ], bpm:77, startDelay:20, vol:0.20 },
+          { type:'crystal',  name:'クリスタルボウル', icon:'🔮',
+            freqs:[_.C4, _.G4, _.C5], interval:18000, startDelay:16, vol:0.26 },
           { type:'orgol',    name:'オルゴール',            icon:'🎶',
             patterns:[
               [_.C5, null, null, null, _.G4, null, null, null],
@@ -2904,6 +2952,51 @@ class HealingApp {
     this.schedulerTmrs.push(setTimeout(ring, intervalMs * (0.4 + Math.random() * 0.4)));
   }
 
+  // Crystal singing bowl scheduler — 倍音浴 (overtone bath) for sleep
+  // Two frequencies are staggered at startup (0 + interval/3) so the
+  // harmonic series of each bowl immediately overlaps, creating an immersive
+  // resonant field. A main cycle then keeps new tones entering every ~interval ms.
+  _scheduleCrystalBowl(def, destGain) {
+    const freqs      = def.freqs || [264, 396, 528];  // C4, G4, C5 by default
+    const intervalMs = def.interval || 18000;
+    const startMs    = (def.startDelay || 12) * 1000;
+
+    const strike = (freq) => {
+      if (!this.isPlaying) return;
+      const dur = 16 + Math.random() * 5;   // 16–21 s long sustain
+      const buf = computeCrystalBowlBuffer(this.ac, freq, dur);
+      const src = this.ac.createBufferSource();
+      src.buffer = buf;
+      const g = this.ac.createGain();
+      g.gain.value = 1.0;
+      src.connect(g);
+      g.connect(destGain);
+      g.connect(this.reverbSend);  // generous reverb for spatial bath effect
+      src.start();
+      src.stop(this.ac.currentTime + dur + 0.5);
+    };
+
+    let freqIdx = 2;
+    const cycle = () => {
+      if (!this.isPlaying) return;
+      strike(freqs[freqIdx % freqs.length]);
+      freqIdx++;
+      const jitter = intervalMs * 0.18 * (Math.random() * 2 - 1);
+      this.schedulerTmrs.push(setTimeout(cycle, intervalMs + jitter));
+    };
+
+    // Initial stagger: play first two frequencies immediately on start
+    // so there's already a layered overtone field without waiting one full interval.
+    this.schedulerTmrs.push(setTimeout(() => {
+      strike(freqs[0]);                      // C4 strikes at startDelay
+      this.schedulerTmrs.push(             // G4 strikes startDelay + interval/3
+        setTimeout(() => strike(freqs[1 % freqs.length]), Math.round(intervalMs / 3))
+      );
+      // Main rolling cycle starts after first interval
+      this.schedulerTmrs.push(setTimeout(cycle, intervalMs));
+    }, startMs));
+  }
+
   // Harp arpeggiator: multi-pattern rotation, velocity variation,
   // 10% chance of a silent "breath" after each pattern for organic feel
   _schedulePatternArp(patterns, bpm, destGain, startDelaySec = 3) {
@@ -3379,6 +3472,16 @@ class HealingApp {
           g.connect(this.reverbSend);
           this.layers.push({ name: def.name, icon: def.icon, gainNode: g, nodes: [], defaultVol: def.vol });
           this._scheduleGlockNotes(def.patterns, def.bpm, g, def.startDelay || 8);
+          break;
+        }
+        case 'crystal': {
+          // Crystal singing bowl — long sustained tones for 倍音浴 (overtone bath)
+          const g = this.ac.createGain();
+          g.gain.value = 0;
+          g.connect(this.dryBus);
+          // reverbSend wired inside _scheduleCrystalBowl per-note for wet blend
+          this.layers.push({ name: def.name, icon: def.icon, gainNode: g, nodes: [], defaultVol: def.vol });
+          this._scheduleCrystalBowl(def, g);
           break;
         }
         case 'orgol': {
