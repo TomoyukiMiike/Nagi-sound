@@ -142,7 +142,16 @@
         </svg>
       </button>
       <span class="ms-brand">凪 Music</span>
-      <button class="ms-skip-btn" id="ms-skip-btn" aria-label="次のトラックへ">次へ ›</button>
+      <div class="ms-top-controls">
+        <button class="ms-playpause-btn" id="ms-playpause-btn" aria-label="停止">
+          <!-- icon injected by JS -->
+          <svg class="ms-pp-icon" id="ms-pp-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <rect x="3" y="2" width="3.5" height="12" rx="1.2"/>
+            <rect x="9.5" y="2" width="3.5" height="12" rx="1.2"/>
+          </svg>
+        </button>
+        <button class="ms-skip-btn" id="ms-skip-btn" aria-label="次のトラックへ">次へ ›</button>
+      </div>
     </div>
     <!-- Situation tab rail (populated by NagiMusic._renderTabs()) -->
     <div id="ms-track-rail" class="ms-track-rail" role="tablist"></div>

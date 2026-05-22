@@ -5817,6 +5817,7 @@ class NagiMusic {
     this.masterGain    = null;
     this.trackGain     = null;
     this.isPlaying     = false;
+    this.isPaused      = false;    // true while user-paused (engine alive, scheduler stopped)
     this.trackIdx      = 0;
     this._step         = 0;        // 0-15 within current bar
     this._bar          = 0;        // bars elapsed in current chord cycle
@@ -5878,6 +5879,7 @@ class NagiMusic {
     this._renderTabs();
     this._startVis();
     this._updateUI();
+    this._updatePlayBtn();
   }
 
   close() {
@@ -5902,17 +5904,34 @@ class NagiMusic {
     }
   }
 
-  // Select a track by index — called by tab clicks
+  // Select a track by index — called by tab clicks.
+  // Always generates a fresh procedural session (even same tab = new variation).
   selectTrack(idx) {
-    if (idx === this.trackIdx) return;
     if (this._transitioning) return;
+    const isSame = (idx === this.trackIdx);
     this._transitioning = true;
 
-    const sub = document.getElementById('ms-track-sub');
-    if (sub) sub.textContent = '切り替え中...';
+    // If paused: auto-resume so the new track plays immediately
+    if (this.isPaused) {
+      this.isPaused = false;
+      if (this.ac) {
+        if (this.ac.state === 'suspended') this.ac.resume();
+        const vol = (+document.getElementById('ms-vol').value) / 100;
+        this.masterGain.gain.setTargetAtTime(vol, this.ac.currentTime, 0.3);
+        this._nextStepTime = this.ac.currentTime + 0.10;
+        this._scheduler();
+      }
+      this._updatePlayBtn();
+    }
 
-    // Short crossfade: 0.8 s
-    this.trackGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.25);
+    const sub = document.getElementById('ms-track-sub');
+    if (sub) sub.textContent = '生成中...';
+
+    // Same tab: brief dip (0.15 s); different tab: longer crossfade (0.25 s)
+    const tc    = isSame ? 0.12 : 0.25;
+    const delay = isSame ? 480  : 900;
+    if (this.trackGain && this.ac)
+      this.trackGain.gain.setTargetAtTime(0, this.ac.currentTime, tc);
 
     setTimeout(() => {
       this.trackIdx = idx;
@@ -5920,18 +5939,20 @@ class NagiMusic {
       this._bar     = 0;
       this._transitioning = false;
 
-      // Generate a fresh procedural session for the new track
+      // Always generate a fresh session → new progression, BPM, arp style
       this._generateSession();
 
       this._stopPad();
       this._startPad();
 
-      this.trackGain.gain.cancelScheduledValues(this.ac.currentTime);
-      this.trackGain.gain.setValueAtTime(0, this.ac.currentTime);
-      this.trackGain.gain.setTargetAtTime(1, this.ac.currentTime, 0.8);
+      if (this.trackGain && this.ac) {
+        this.trackGain.gain.cancelScheduledValues(this.ac.currentTime);
+        this.trackGain.gain.setValueAtTime(0, this.ac.currentTime);
+        this.trackGain.gain.setTargetAtTime(1, this.ac.currentTime, 0.6);
+      }
 
       this._updateUI();
-    }, 900);
+    }, delay);
   }
 
   setVol(v) {
@@ -5955,6 +5976,67 @@ class NagiMusic {
       this._sessionBassPattern = EDM_BASS_PATTERNS[Math.floor(Math.random() * EDM_BASS_PATTERNS.length)];
       this._sessionStabSteps   = EDM_STAB_STEPS[Math.floor(Math.random() * EDM_STAB_STEPS.length)];
       this._sessionArpPat      = EDM_ARP_PATTERNS[Math.floor(Math.random() * EDM_ARP_PATTERNS.length)];
+    }
+  }
+
+  // ── Play / Stop public API ──────────────────────────────────────────────────
+
+  // Toggle play ↔ stop (called by the ⏸/▶ button in the topbar)
+  togglePlay() {
+    if (!this.ac) return;           // engine not yet started
+    if (this.isPaused) this._resume();
+    else               this._pause();
+  }
+
+  _pause() {
+    if (!this.isPlaying || this.isPaused) return;
+    this.isPaused = true;
+    // Stop the lookahead scheduler (notes already queued play out, then silence)
+    if (this._schedTmr) { clearTimeout(this._schedTmr); this._schedTmr = null; }
+    // Fade master to silence
+    if (this.masterGain && this.ac)
+      this.masterGain.gain.setTargetAtTime(0, this.ac.currentTime, 0.25);
+    // Release sustaining pad
+    this._stopPad();
+    this._updatePlayBtn();
+  }
+
+  _resume() {
+    if (!this.isPlaying || !this.isPaused) return;
+    this.isPaused = false;
+    if (this.ac && this.ac.state === 'suspended') this.ac.resume();
+    // Restore master volume
+    if (this.masterGain && this.ac) {
+      const vol = (+document.getElementById('ms-vol').value) / 100;
+      this.masterGain.gain.setTargetAtTime(vol, this.ac.currentTime, 0.35);
+    }
+    // Re-anchor scheduler to right now so there's no timing jump
+    this._nextStepTime = this.ac.currentTime + 0.10;
+    // Restart pad and scheduler
+    this._startPad();
+    this._scheduler();
+    this._updatePlayBtn();
+  }
+
+  // Update the ⏸/▶ button icon to reflect current state
+  _updatePlayBtn() {
+    const btn = document.getElementById('ms-playpause-btn');
+    if (!btn) return;
+    if (this.isPaused) {
+      // Show play triangle
+      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
+        <path d="M4 2.5l9 5-9 5V2.5z"/>
+      </svg>`;
+      btn.setAttribute('aria-label', '再生');
+      btn.classList.add('paused');
+    } else {
+      // Show pause bars
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+        <rect x="2.5" y="1.5" width="3" height="11" rx="1"/>
+        <rect x="8.5" y="1.5" width="3" height="11" rx="1"/>
+      </svg>`;
+      btn.setAttribute('aria-label', '停止');
+      btn.classList.remove('paused');
     }
   }
 
@@ -6420,6 +6502,7 @@ class NagiMusic {
     document.querySelectorAll('.ms-track-tab').forEach((btn, i) => {
       btn.classList.toggle('active', i === this.trackIdx);
     });
+    this._updatePlayBtn();
   }
 
   // Render (or re-render) the situation tab rail
@@ -6507,6 +6590,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Back button ──
   document.getElementById('ms-back-btn').addEventListener('click', () => {
     nagiMusic.close();
+  });
+
+  // ── Play / Pause toggle ──
+  document.getElementById('ms-playpause-btn').addEventListener('click', () => {
+    nagiMusic.togglePlay();
   });
 
   // ── Skip to next track ──

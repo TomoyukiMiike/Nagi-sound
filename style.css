@@ -600,6 +600,38 @@ html, body {
   letter-spacing: 0.12em;
 }
 
+.ms-top-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.48rem;
+}
+
+/* ── Play / Stop toggle ─────────────────────────────────────────────────── */
+.ms-playpause-btn {
+  background: rgba(56,189,248,0.10);
+  border: 1.5px solid rgba(56,189,248,0.32);
+  border-radius: 50%;
+  width: 2.15rem;
+  height: 2.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(180,225,255,0.90);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, transform 0.10s;
+}
+.ms-playpause-btn:active {
+  background: rgba(56,189,248,0.26);
+  border-color: rgba(56,189,248,0.62);
+  transform: scale(0.92);
+}
+/* When paused: pulse hint */
+.ms-playpause-btn.paused {
+  border-color: rgba(56,189,248,0.20);
+  color: rgba(180,225,255,0.50);
+}
+
 .ms-skip-btn {
   background: none;
   border: 1px solid rgba(100,180,240,0.22);
