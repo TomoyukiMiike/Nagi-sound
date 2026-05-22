@@ -5645,6 +5645,106 @@ function computePickBass(ac, freq, dur = 2.0) {
   return buf;
 }
 
+// ── Synthesizer instruments ──────────────────────────────────────────────────
+//
+// These produce honest electronic sounds — no pretense of faking acoustic
+// instruments. Each track's character comes from cutoff / detune parameters.
+
+// Synth pad — 3 detuned sawtooth voices through a one-pole LP filter.
+// Models an analogue unison pad (Juno, OB-6, etc.). The detune spread creates
+// the characteristic chorus shimmer; cutoff controls brightness / warmth.
+//
+// cutoffHz   : LP filter frequency (e.g. 650=dark/warm, 2800=bright/airy)
+// detuneCents: width of the three-voice unison spread (e.g. 5=tight, 18=wide)
+function computeSynthPadNote(ac, freq, dur = 2.4, cutoffHz = 1400, detuneCents = 10) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+
+  // Three sawtooth voices: centre, +detune, -detune
+  const ratio = Math.pow(2, detuneCents / 1200);
+  const freqs = [freq, freq * ratio, freq / ratio];
+  const amps  = [0.52, 0.30, 0.30];   // centre slightly louder
+  // Random start phases so repeated calls don't phase-lock
+  const phases = freqs.map(() => Math.random());
+  const incs   = freqs.map(f => f / sr);
+
+  // Envelope: 20 ms attack, release = 15% of dur (min 60 ms)
+  const attLen = Math.round(sr * 0.020);
+  const relLen = Math.round(Math.max(sr * 0.060, sr * dur * 0.15));
+  const relStart = len - relLen;
+
+  // One-pole LP: α = exp(-2π·fc/sr)
+  const alpha = Math.exp(-2 * Math.PI * (cutoffHz / sr));
+  let lp = 0;
+
+  for (let i = 0; i < len; i++) {
+    let raw = 0;
+    for (let v = 0; v < 3; v++) {
+      phases[v] = (phases[v] + incs[v]) % 1;
+      raw += (2 * phases[v] - 1) * amps[v]; // sawtooth: phase→[-1,1] ramp
+    }
+    lp = alpha * lp + (1 - alpha) * raw;   // low-pass
+
+    let env = 1.0;
+    if (i < attLen)    env = i / attLen;
+    if (i >= relStart) env = (len - i) / relLen;
+    d[i] = lp * env;
+  }
+
+  let pk = 0;
+  for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(d[i]));
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.84;
+  return buf;
+}
+
+// Synth lead — square wave (50% duty cycle) with a decaying filter envelope.
+// At note onset the LP cutoff starts at 3×cutoffHz (bright attack), then
+// decays towards cutoffHz with τ = 0.45 s — the classic "wah" of a synth lead.
+// Works best in the C4–C5 melody range; each track controls the cutoff.
+//
+// cutoffHz: sustained brightness (e.g. 1200=warm/dreamy, 4000=bright/cutting)
+function computeSynthLeadNote(ac, freq, dur = 2.4, cutoffHz = 2400) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+
+  const phase0  = Math.random();
+  const inc     = freq / sr;
+  const hiCutoff = Math.min(cutoffHz * 3.5, sr * 0.44); // bright attack cap
+  const filterTau = 0.45;  // sec — how fast envelope closes
+
+  const attLen   = Math.round(sr * 0.006);  // 6 ms crisp attack
+  const relLen   = Math.round(Math.max(sr * 0.08, sr * dur * 0.18));
+  const relStart = len - relLen;
+
+  let phase = phase0;
+  let lp    = 0;
+
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    phase = (phase + inc) % 1;
+    const raw = phase < 0.5 ? 1.0 : -1.0;   // square wave
+
+    // Filter envelope: starts bright, closes to cutoffHz
+    const fc    = (cutoffHz + (hiCutoff - cutoffHz) * Math.exp(-t / filterTau)) / sr;
+    const alpha = Math.exp(-2 * Math.PI * fc);
+    lp = alpha * lp + (1 - alpha) * raw;
+
+    let env = 1.0;
+    if (i < attLen)    env = i / attLen;
+    if (i >= relStart) env = (len - i) / relLen;
+    d[i] = lp * env;
+  }
+
+  let pk = 0;
+  for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(d[i]));
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.80;
+  return buf;
+}
+
 // Piano chord note — 5-partial additive synthesis, 2.4-second sustain.
 // This is the main comping instrument; it needs to ring clearly above guitar.
 // Two slightly detuned unison strings (+0 / +2 cents) create the characteristic
@@ -5850,72 +5950,76 @@ const PIANO_ARP_STYLES = [
 
 // 6 situation tracks — tabs match the healing mode categories
 const MUSIC_TRACKS = [
+  // ── Track character matrix ──────────────────────────────────────────────────
+  // padCutoff  : LP filter freq for synth pad  (low=warm/dark, high=bright/airy)
+  // padDetune  : voice-spread in cents          (low=tight, high=wide/chorus)
+  // leadCutoff : sustained brightness for synth lead
+  // NO guitar: all sounds are honest synthesiser output, not fake acoustic.
   {
     id: 'morning', name: '朝', icon: '🌅',
     sub: 'コーヒーと朝の光の中で',
     bpmRange: [84,90], drumPat: 'boomBap', barsPerChord: 4,
-    pianoSteps: [0, 8],         // anchor chord on beats 1 & 3
-    pianoNotes: 4,
-    pianoArpDensity: 0.82,      // flowing Coldplay arpeggio, very frequent
-    guitarDensity: 0.08,        // ghost accent — barely audible shimmer
-    melodChance: 0.74,          // piano melody is the lead voice
-    // piano & melo dominate; guitar is a whisper; drums & bass stay prominent
-    vol: { k:0.74, s:0.56, h:0.26, bass:0.72, piano:0.58, guitar:0.07, melo:0.48, pad:0.05 },
+    pianoSteps: [0, 8], pianoNotes: 4,
+    pianoArpDensity: 0.80,
+    melodChance: 0.72,
+    // Bright future-bass feel: high cutoff, tight detune, cutting lead
+    padCutoff: 2800, padDetune: 7, leadCutoff: 4000,
+    vol: { k:0.74, s:0.56, h:0.26, bass:0.70, piano:0.58, melo:0.50, pad:0.05 },
   },
   {
     id: 'relax', name: 'リラックス', icon: '🌿',
     sub: '深呼吸して、ゆっくりと',
     bpmRange: [68,76], drumPat: 'minimal', barsPerChord: 8,
-    pianoSteps: [0, 8],
-    pianoNotes: 4,
-    pianoArpDensity: 0.72,      // "The Scientist" — gentle rolling arpeggio
-    guitarDensity: 0.07,        // barely there
-    melodChance: 0.68,
-    vol: { k:0.42, s:0.30, h:0.15, bass:0.66, piano:0.56, guitar:0.06, melo:0.46, pad:0.08 },
+    pianoSteps: [0, 8], pianoNotes: 4,
+    pianoArpDensity: 0.68,
+    melodChance: 0.64,
+    // Chillwave warmth: low cutoff, wide detune → hazy dreamlike chorus
+    padCutoff: 780, padDetune: 15, leadCutoff: 1100,
+    vol: { k:0.42, s:0.30, h:0.15, bass:0.64, piano:0.56, melo:0.46, pad:0.08 },
   },
   {
     id: 'walk', name: '散歩', icon: '🚶',
     sub: '街を歩きながら',
     bpmRange: [92,100], drumPat: 'fourFloor', barsPerChord: 4,
-    pianoSteps: [0, 8],         // beat-anchored comping (simplified from off-beat)
-    pianoNotes: 3,
-    pianoArpDensity: 0.85,      // energetic arpeggio — rhythmic forward motion
-    guitarDensity: 0.10,        // light accent during walk feel
-    melodChance: 0.76,
-    vol: { k:0.78, s:0.62, h:0.28, bass:0.72, piano:0.56, guitar:0.08, melo:0.46, pad:0.04 },
+    pianoSteps: [0, 8], pianoNotes: 3,
+    pianoArpDensity: 0.85,
+    melodChance: 0.74,
+    // Indie-electronic bounce: mid-bright cutoff, medium detune, punchy lead
+    padCutoff: 2200, padDetune: 9, leadCutoff: 3400,
+    vol: { k:0.78, s:0.62, h:0.28, bass:0.72, piano:0.56, melo:0.48, pad:0.04 },
   },
   {
     id: 'focus', name: '集中', icon: '✨',
     sub: '作業に没頭する時間',
     bpmRange: [80,88], drumPat: 'steadyHat', barsPerChord: 4,
-    pianoSteps: [0, 8],
-    pianoNotes: 4,
-    pianoArpDensity: 0.65,      // steady but not intrusive; focus-friendly
-    guitarDensity: 0.06,        // near-silent guitar
-    melodChance: 0.58,
-    vol: { k:0.64, s:0.46, h:0.22, bass:0.70, piano:0.54, guitar:0.06, melo:0.42, pad:0.06 },
+    pianoSteps: [0, 8], pianoNotes: 4,
+    pianoArpDensity: 0.62,
+    melodChance: 0.54,
+    // Minimal ambient-techno: clean mid cutoff, tight detune, smooth lead
+    padCutoff: 1100, padDetune: 5, leadCutoff: 1800,
+    vol: { k:0.64, s:0.46, h:0.22, bass:0.68, piano:0.54, melo:0.44, pad:0.06 },
   },
   {
     id: 'meditation', name: '瞑想', icon: '🌸',
     sub: '静かに、ただ存在する',
     bpmRange: [56,64], drumPat: 'ambient', barsPerChord: 8,
-    pianoSteps: [0],            // single chord drop per bar — spacious
-    pianoNotes: 4,
-    pianoArpDensity: 0.40,      // sparse, contemplative; notes emerge from silence
-    guitarDensity: 0.05,        // essentially inaudible — atmosphere only
-    melodChance: 0.40,
-    vol: { k:0.0, s:0.0, h:0.0, bass:0.56, piano:0.58, guitar:0.05, melo:0.44, pad:0.10 },
+    pianoSteps: [0], pianoNotes: 4,
+    pianoArpDensity: 0.38,
+    melodChance: 0.38,
+    // Dark ambient drone: very low cutoff, widest detune → thick lush fog
+    padCutoff: 560, padDetune: 18, leadCutoff: 850,
+    vol: { k:0.0, s:0.0, h:0.0, bass:0.54, piano:0.58, melo:0.44, pad:0.10 },
   },
   {
     id: 'night', name: '夜', icon: '🌙',
     sub: '夜、窓の外を眺めながら',
     bpmRange: [64,72], drumPat: 'minimal', barsPerChord: 8,
-    pianoSteps: [0, 8],
-    pianoNotes: 4,
-    pianoArpDensity: 0.62,      // dreamy, unhurried — "Fix You" atmosphere
-    guitarDensity: 0.06,        // phantom guitar in the background
-    melodChance: 0.65,
-    vol: { k:0.36, s:0.24, h:0.12, bass:0.64, piano:0.56, guitar:0.06, melo:0.44, pad:0.08 },
+    pianoSteps: [0, 8], pianoNotes: 4,
+    pianoArpDensity: 0.60,
+    melodChance: 0.62,
+    // Downtempo atmospheric: dark cutoff, moderate detune, ethereal lead
+    padCutoff: 720, padDetune: 13, leadCutoff: 1600,
+    vol: { k:0.36, s:0.24, h:0.12, bass:0.62, piano:0.56, melo:0.44, pad:0.08 },
   },
   {
     id: 'edm', name: 'EDM', icon: '⚡',
@@ -6517,60 +6621,44 @@ class NagiMusic {
       this._updatePad(chord, track.vol.pad, when);
     }
 
-    // ── Acoustic guitar — accent only (Coldplay: barely audible shimmer) ────
-    // Fires on 8th-note grid at very low density so guitar is a ghost texture,
-    // not a competing voice. Guitar vol is set very low in each track.
-    if (si % 2 === 0 && track.guitarDensity > 0) {
-      const arpStep = (si / 2) % this._sessionGuitarArp.length;
-      const noteIdx = this._sessionGuitarArp[arpStep];
-      const freq    = chord.pads[Math.min(noteIdx, chord.pads.length - 1)];
-      if (Math.random() < track.guitarDensity) {
-        const jitter = (Math.random() - 0.5) * 0.015;
-        this._pb(
-          this._getGuitarBuffer(freq),
-          Math.max(when, when + jitter),
-          track.vol.guitar * (0.60 + Math.random() * 0.40)
-        );
-      }
-    }
-
-    // ── Piano arpeggio — Coldplay signature texture (8th-note grid) ──────────
-    // Flowing arpeggio through chord tones: "Clocks", "The Scientist" feel.
-    // Uses the cached chord-note buffer (2.4 s sustain, right resonance for arp).
-    // Fires independently of chord comping for continuous movement.
+    // ── Synth pad arpeggio (8th-note grid) ───────────────────────────────────
+    // Detuned-saw pad through track-specific LP filter.  Each track has its own
+    // padCutoff + padDetune so the arpeggio texture sounds completely different:
+    // bright future-bass (morning) vs dark-ambient waterfall (meditation).
     if (si % 2 === 0 && this._sessionPianoArp && Math.random() < (track.pianoArpDensity || 0)) {
       const arpStep = (si / 2) % this._sessionPianoArp.length;
       const noteIdx = this._sessionPianoArp[arpStep];
       const freq    = chord.pads[Math.min(noteIdx, chord.pads.length - 1)];
       const jitter  = (Math.random() - 0.5) * 0.008;
-      this._pb(
-        this._getPianoBuffer(freq),
-        Math.max(when, when + jitter),
-        track.vol.piano * (0.52 + Math.random() * 0.22)   // slightly softer than comp chord
-      );
+      const buf     = computeSynthPadNote(this.ac, freq, 1.1,
+                        track.padCutoff || 1400, track.padDetune || 10);
+      this._pb(buf, Math.max(when, when + jitter),
+               track.vol.piano * (0.50 + Math.random() * 0.20));
     }
 
-    // ── Piano chord comping — root-position anchor on pianoSteps ────────────
-    // Staggered 18 ms roll for natural feel.  Bass register handled separately.
+    // ── Synth pad chord comping (pianoSteps) ─────────────────────────────────
+    // Full voicing staggered 16 ms per note for a natural chord roll.
+    // Same pad timbre as the arp but at full duration (2.4 s) for harmonic body.
     if (track.pianoSteps.includes(si)) {
       const voicing = chord.pads.slice(0, track.pianoNotes);
       voicing.forEach((freq, i) => {
-        this._pb(
-          this._getPianoBuffer(freq),
-          when + i * 0.018,
-          track.vol.piano * (i === 0 ? 1.0 : 0.80)
-        );
+        const buf = computeSynthPadNote(this.ac, freq, 2.4,
+                      track.padCutoff || 1400, track.padDetune || 10);
+        this._pb(buf, when + i * 0.016,
+                 track.vol.piano * (i === 0 ? 1.0 : 0.82));
       });
     }
 
-    // ── Piano melody — main lead voice (Coldplay: the tune you sing along to) ─
-    // Full-quality 5.5-s computePianoBuffer, prominent volume, quarter-note grid.
-    // melodChance is now high (0.55–0.82) so melody drives continuously.
+    // ── Synth lead melody (quarter-note grid) ────────────────────────────────
+    // Square wave + decaying filter envelope: punchy at attack, settles to the
+    // track's leadCutoff.  melodChance is high (0.38–0.80) so melody is
+    // continuous; each track's leadCutoff defines its personality
+    // (4000=cutting morning vs 850=whisper-dark meditation).
     if (si % 4 === 0 && Math.random() < track.melodChance) {
       const freq = this._nextMeloNote(chord);
-      // velocity=0.78 → rich attack + shimmer; duration=2.8 s → notes ring out
-      const buf  = computePianoBuffer(this.ac, freq, 0.78, 2.8);
-      this._pb(buf, when, track.vol.melo);   // full melo volume — no penalty
+      const buf  = computeSynthLeadNote(this.ac, freq, 2.6,
+                     track.leadCutoff || 2400);
+      this._pb(buf, when, track.vol.melo);
     }
   }
 
