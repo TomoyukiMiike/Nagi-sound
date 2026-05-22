@@ -5371,53 +5371,72 @@ class HealingApp {
 
 // ── Drum synthesis ──────────────────────────────────────────────────────────
 
+// ── NES-style drum synthesis ─────────────────────────────────────────────────
+// NES has no real drum hardware — composers used the triangle (ch3) and noise (ch4)
+// channels creatively. Mother 2 does exactly this.
+
+// Kick: triangle wave with rapid pitch sweep (140→28 Hz) + short noise transient.
+// Evokes the "thud" from NES triangle channel rather than a 808 sine kick.
 function computeKickBuffer(ac) {
-  const sr = ac.sampleRate, dur = 0.52;
+  const sr  = ac.sampleRate, dur = 0.22;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
-  const d = buf.getChannelData(0);
-  let ph = 0;
+  const d   = buf.getChannelData(0);
+  let phase = 0, lfsr = 0x7FFF;
   for (let i = 0; i < len; i++) {
-    const t = i / sr;
-    const freq = 42 + 120 * Math.exp(-28 * t);   // 162→42 Hz sweep
-    ph += 2 * Math.PI * freq / sr;
-    const env = 0.55 * Math.exp(-14 * t) + 0.45 * Math.exp(-4 * t);
-    d[i] = env * Math.sin(ph);
+    const t    = i / sr;
+    const freq = 28 + 112 * Math.exp(-38 * t);   // 140→28 Hz sweep
+    phase = (phase + freq / sr) % 1;
+    let tri = phase < 0.5 ? 4 * phase - 1 : 3 - 4 * phase;
+    tri = Math.round(tri * 7.5) / 7.5;           // 4-bit (16 levels)
+    // LFSR noise burst for transient "click"
+    const bit  = ((lfsr >> 14) ^ (lfsr >> 13)) & 1;
+    lfsr = ((lfsr << 1) | bit) & 0x7FFF;
+    const noise = ((lfsr & 1) ? 1.0 : -1.0) * Math.exp(-t * 130);
+    d[i] = (tri * 0.80 + noise * 0.28) * Math.exp(-t * 9);
   }
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.96;
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.94;
   return buf;
 }
 
+// Hi-hat: NES short-period LFSR noise (feedback bit14 XOR bit8).
+// Short period → more metallic "tik" tone than white noise.
 function computeHihatBuffer(ac, open = false) {
-  const sr = ac.sampleRate;
-  const dur = open ? 0.38 : 0.07;
+  const sr  = ac.sampleRate;
+  const dur = open ? 0.13 : 0.038;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
-  const d = buf.getChannelData(0);
-  const dc = open ? 8 : 68;
+  const d   = buf.getChannelData(0);
+  let lfsr  = 0x7FFF;
+  const dc  = open ? 26 : 105;
   for (let i = 0; i < len; i++) {
-    const t = i / sr;
-    const ring = Math.sin(2*Math.PI*8400*t)*0.22 + Math.sin(2*Math.PI*10600*t)*0.14;
-    d[i] = ((Math.random()*2-1)*0.75 + ring*0.25) * Math.exp(-dc * t);
+    const t   = i / sr;
+    const bit = ((lfsr >> 14) ^ (lfsr >> 8)) & 1;   // short-period mode
+    lfsr = ((lfsr << 1) | bit) & 0x7FFF;
+    d[i] = ((lfsr & 1) ? 1.0 : -1.0) * Math.exp(-dc * t);
   }
+  let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.72;
   return buf;
 }
 
+// Snare: NES long-period LFSR noise (feedback bit14 XOR bit13).
+// Long period → fuller "shhh" noise; envelope gives shape.
 function computeSnareBuffer(ac) {
-  const sr = ac.sampleRate, dur = 0.26;
+  const sr  = ac.sampleRate, dur = 0.14;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
-  const d = buf.getChannelData(0);
+  const d   = buf.getChannelData(0);
+  let lfsr  = 0x7FFF;
   for (let i = 0; i < len; i++) {
-    const t = i / sr;
-    const noise = (Math.random()*2-1) * Math.exp(-22 * t);
-    const body  = Math.sin(2*Math.PI*188*t) * Math.exp(-38 * t) * 0.45;
-    const click = Math.exp(-240 * t) * 0.22;
-    d[i] = noise*0.72 + body + click;
+    const t   = i / sr;
+    const bit = ((lfsr >> 14) ^ (lfsr >> 13)) & 1;  // long-period mode
+    lfsr = ((lfsr << 1) | bit) & 0x7FFF;
+    d[i] = ((lfsr & 1) ? 1.0 : -1.0) * Math.exp(-t * 26);
   }
   let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
-  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.90;
+  if (pk > 0) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.88;
   return buf;
 }
 
@@ -5645,103 +5664,137 @@ function computePickBass(ac, freq, dur = 2.0) {
   return buf;
 }
 
-// ── Synthesizer instruments ──────────────────────────────────────────────────
+// ── Chiptune instrument synthesis (NES / SNES style) ─────────────────────────
 //
-// These produce honest electronic sounds — no pretense of faking acoustic
-// instruments. Each track's character comes from cutoff / detune parameters.
+// Mother 2 (EarthBound) uses the SNES SPC700 — 8 channels with ADSR, echo,
+// and Gaussian-interpolated samples.  We approximate the essential aesthetic
+// with three building blocks:
+//   1. computeChipPulse  — NES pulse wave (lead melody, 4-bit ADSR, vibrato)
+//   2. computeChipArp    — rapid arpeggio implying a chord on a single channel
+//   3. computeChipTriangle — NES triangle wave (bass, 4-bit stepped)
+//
+// Each track selects its own duty cycle and vibrato to create a distinct feel.
 
-// Synth pad — 3 detuned sawtooth voices through a one-pole LP filter.
-// Models an analogue unison pad (Juno, OB-6, etc.). The detune spread creates
-// the characteristic chorus shimmer; cutoff controls brightness / warmth.
+// NES pulse wave with 4-bit volume envelope (16 levels) and delayed vibrato.
 //
-// cutoffHz   : LP filter frequency (e.g. 650=dark/warm, 2800=bright/airy)
-// detuneCents: width of the three-voice unison spread (e.g. 5=tight, 18=wide)
-function computeSynthPadNote(ac, freq, dur = 2.4, cutoffHz = 1400, detuneCents = 10) {
+// duty:      0.125 = nasal/thin (aggressive or background)
+//            0.25  = classic bright NES lead
+//            0.50  = round/hollow (softer voices, lower register)
+// vibDepth:  cents (4–8 typical for NES)
+// vibRate:   Hz (4–7 Hz typical game vibrato)
+function computeChipPulse(ac, freq, dur, duty = 0.25, vibRate = 5.5, vibDepth = 5) {
   const sr  = ac.sampleRate;
   const len = Math.round(sr * dur);
   const buf = ac.createBuffer(1, len, sr);
   const d   = buf.getChannelData(0);
 
-  // Three sawtooth voices: centre, +detune, -detune
-  const ratio = Math.pow(2, detuneCents / 1200);
-  const freqs = [freq, freq * ratio, freq / ratio];
-  const amps  = [0.52, 0.30, 0.30];   // centre slightly louder
-  // Random start phases so repeated calls don't phase-lock
-  const phases = freqs.map(() => Math.random());
-  const incs   = freqs.map(f => f / sr);
+  // Vibrato parameters: delayed onset (100 ms) + 140 ms fade-in
+  const vibAmt    = Math.pow(2, vibDepth / 1200) - 1;
+  const vibDelay  = Math.round(sr * 0.10);
+  const vibFadeIn = Math.round(sr * 0.14);
 
-  // Envelope: 20 ms attack, release = 15% of dur (min 60 ms)
-  const attLen = Math.round(sr * 0.020);
-  const relLen = Math.round(Math.max(sr * 0.060, sr * dur * 0.15));
-  const relStart = len - relLen;
+  // NES-style ADSR: instant attack, 120 ms decay to sustain, gated release
+  const attLen = Math.round(sr * 0.003);
+  const decLen = Math.round(sr * 0.12);
+  const susVol = 0.68;
+  const relLen = Math.round(Math.max(sr * 0.06, sr * dur * 0.14));
+  const relSt  = Math.max(0, len - relLen);
 
-  // One-pole LP: α = exp(-2π·fc/sr)
-  const alpha = Math.exp(-2 * Math.PI * (cutoffHz / sr));
-  let lp = 0;
-
+  let phase = 0;
   for (let i = 0; i < len; i++) {
-    let raw = 0;
-    for (let v = 0; v < 3; v++) {
-      phases[v] = (phases[v] + incs[v]) % 1;
-      raw += (2 * phases[v] - 1) * amps[v]; // sawtooth: phase→[-1,1] ramp
+    // Vibrato (sine FM, delayed)
+    let vib = 0;
+    if (i > vibDelay) {
+      const fade = Math.min(1, (i - vibDelay) / vibFadeIn);
+      vib = vibAmt * fade * Math.sin(2 * Math.PI * vibRate * (i - vibDelay) / sr);
     }
-    lp = alpha * lp + (1 - alpha) * raw;   // low-pass
+    phase = (phase + freq * (1 + vib) / sr) % 1;
+    const pulse = phase < duty ? 1.0 : -1.0;
 
-    let env = 1.0;
-    if (i < attLen)    env = i / attLen;
-    if (i >= relStart) env = (len - i) / relLen;
-    d[i] = lp * env;
+    // 4-bit volume envelope (16 levels — NES authenticity)
+    let env;
+    if (i < attLen)                   env = i / attLen;
+    else if (i < attLen + decLen)     env = 1.0 - (1.0 - susVol) * (i - attLen) / decLen;
+    else if (i < relSt)               env = susVol;
+    else                              env = susVol * (1.0 - (i - relSt) / relLen);
+    env = Math.round(Math.max(0, env) * 15) / 15;
+
+    d[i] = pulse * env;
   }
 
   let pk = 0;
   for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(d[i]));
-  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.84;
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.82;
   return buf;
 }
 
-// Synth lead — square wave (50% duty cycle) with a decaying filter envelope.
-// At note onset the LP cutoff starts at 3×cutoffHz (bright attack), then
-// decays towards cutoffHz with τ = 0.45 s — the classic "wah" of a synth lead.
-// Works best in the C4–C5 melody range; each track controls the cutoff.
+// Rapid arpeggio: cycle through chord tones on a single pulse channel at
+// arpHz steps/sec — the quintessential NES technique for implying harmony.
+// e.g. freqs=[264,330,396] at 80 Hz sounds like a strummed C-major triad.
 //
-// cutoffHz: sustained brightness (e.g. 1200=warm/dreamy, 4000=bright/cutting)
-function computeSynthLeadNote(ac, freq, dur = 2.4, cutoffHz = 2400) {
-  const sr  = ac.sampleRate;
-  const len = Math.round(sr * dur);
-  const buf = ac.createBuffer(1, len, sr);
-  const d   = buf.getChannelData(0);
+// arpHz: arp speed in steps/sec (60=mellow, 80=standard, 120=aggressive)
+function computeChipArp(ac, freqs, dur, duty = 0.25, arpHz = 80) {
+  const sr          = ac.sampleRate;
+  const len         = Math.round(sr * dur);
+  const buf         = ac.createBuffer(1, len, sr);
+  const d           = buf.getChannelData(0);
+  const stepSamples = sr / arpHz;
 
-  const phase0  = Math.random();
-  const inc     = freq / sr;
-  const hiCutoff = Math.min(cutoffHz * 3.5, sr * 0.44); // bright attack cap
-  const filterTau = 0.45;  // sec — how fast envelope closes
+  const attLen = Math.round(sr * 0.004);
+  const relLen = Math.round(Math.max(sr * 0.05, sr * dur * 0.12));
+  const relSt  = Math.max(0, len - relLen);
+  const susVol = 0.72;
 
-  const attLen   = Math.round(sr * 0.006);  // 6 ms crisp attack
-  const relLen   = Math.round(Math.max(sr * 0.08, sr * dur * 0.18));
-  const relStart = len - relLen;
-
-  let phase = phase0;
-  let lp    = 0;
-
+  let phase = 0;
   for (let i = 0; i < len; i++) {
-    const t = i / sr;
-    phase = (phase + inc) % 1;
-    const raw = phase < 0.5 ? 1.0 : -1.0;   // square wave
+    const stepIdx = Math.floor(i / stepSamples) % freqs.length;
+    const freq    = freqs[stepIdx];
+    phase = (phase + freq / sr) % 1;
+    const pulse = phase < duty ? 1.0 : -1.0;
 
-    // Filter envelope: starts bright, closes to cutoffHz
-    const fc    = (cutoffHz + (hiCutoff - cutoffHz) * Math.exp(-t / filterTau)) / sr;
-    const alpha = Math.exp(-2 * Math.PI * fc);
-    lp = alpha * lp + (1 - alpha) * raw;
-
-    let env = 1.0;
+    let env;
     if (i < attLen)    env = i / attLen;
-    if (i >= relStart) env = (len - i) / relLen;
-    d[i] = lp * env;
+    else if (i < relSt) env = susVol;
+    else               env = susVol * (1.0 - (i - relSt) / relLen);
+    env = Math.round(Math.max(0, env) * 15) / 15;
+
+    d[i] = pulse * env;
   }
 
   let pk = 0;
   for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(d[i]));
   if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.80;
+  return buf;
+}
+
+// NES triangle wave (channel 3): 4-bit amplitude steps (16 levels = staircase).
+// No volume envelope in NES hardware — just a soft gate at note boundaries.
+// Classic for bass lines; also used for melody doubling one octave below.
+function computeChipTriangle(ac, freq, dur) {
+  const sr  = ac.sampleRate;
+  const len = Math.round(sr * dur);
+  const buf = ac.createBuffer(1, len, sr);
+  const d   = buf.getChannelData(0);
+
+  const attLen = Math.round(sr * 0.004);
+  const relLen = Math.round(sr * 0.020);
+  const relSt  = Math.max(0, len - relLen);
+
+  let phase = 0;
+  for (let i = 0; i < len; i++) {
+    phase = (phase + freq / sr) % 1;
+    let tri = phase < 0.5 ? 4 * phase - 1 : 3 - 4 * phase;
+    tri = Math.round(tri * 7.5) / 7.5;  // 4-bit: 16 amplitude steps
+
+    let gate = 1.0;
+    if (i < attLen)  gate = i / attLen;
+    if (i >= relSt)  gate = (len - i) / relLen;
+    d[i] = tri * gate;
+  }
+
+  let pk = 0;
+  for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(d[i]));
+  if (pk > 0.001) for (let i = 0; i < len; i++) d[i] = d[i] / pk * 0.88;
   return buf;
 }
 
@@ -5950,87 +6003,92 @@ const PIANO_ARP_STYLES = [
 
 // 6 situation tracks — tabs match the healing mode categories
 const MUSIC_TRACKS = [
-  // ── Track character matrix ──────────────────────────────────────────────────
-  // padCutoff  : LP filter freq for synth pad  (low=warm/dark, high=bright/airy)
-  // padDetune  : voice-spread in cents          (low=tight, high=wide/chorus)
-  // leadCutoff : sustained brightness for synth lead
-  // NO guitar: all sounds are honest synthesiser output, not fake acoustic.
+  // ── Chiptune track character matrix (NES / SNES / Mother 2 style) ──────────
+  //
+  // chipLeadDuty  : pulse duty cycle for lead melody
+  //                 0.50 = hollow/round  0.25 = bright/classic  0.125 = nasal/thin
+  // chipArpDuty   : pulse duty cycle for chord arpeggio channel
+  // chipVibDepth  : lead vibrato depth in cents (0=off, 4–8=NES range)
+  // chipVibRate   : lead vibrato rate Hz (4–7 typical)
+  // chipArpHz     : arpeggio speed steps/sec (60=slow/dreamy, 120=fast/aggressive)
   {
     id: 'morning', name: '朝', icon: '🌅',
     sub: 'コーヒーと朝の光の中で',
     bpmRange: [84,90], drumPat: 'boomBap', barsPerChord: 4,
-    pianoSteps: [0, 8], pianoNotes: 4,
-    pianoArpDensity: 0.80,
-    melodChance: 0.72,
-    // Bright future-bass feel: high cutoff, tight detune, cutting lead
-    padCutoff: 2800, padDetune: 7, leadCutoff: 4000,
-    vol: { k:0.74, s:0.56, h:0.26, bass:0.70, piano:0.58, melo:0.50, pad:0.05 },
+    pianoSteps: [0, 8], pianoNotes: 3,
+    pianoArpDensity: 0.82,
+    melodChance: 0.74,
+    // Bright NES town-music feel: classic 25% lead, chirpy 25% arp, lively vib
+    chipLeadDuty: 0.25, chipArpDuty: 0.25, chipVibDepth: 6, chipVibRate: 5.8, chipArpHz: 80,
+    vol: { k:0.74, s:0.56, h:0.28, bass:0.70, piano:0.56, melo:0.50, pad:0.04 },
   },
   {
     id: 'relax', name: 'リラックス', icon: '🌿',
     sub: '深呼吸して、ゆっくりと',
     bpmRange: [68,76], drumPat: 'minimal', barsPerChord: 8,
-    pianoSteps: [0, 8], pianoNotes: 4,
-    pianoArpDensity: 0.68,
-    melodChance: 0.64,
-    // Chillwave warmth: low cutoff, wide detune → hazy dreamlike chorus
-    padCutoff: 780, padDetune: 15, leadCutoff: 1100,
-    vol: { k:0.42, s:0.30, h:0.15, bass:0.64, piano:0.56, melo:0.46, pad:0.08 },
+    pianoSteps: [0, 8], pianoNotes: 3,
+    pianoArpDensity: 0.65,
+    melodChance: 0.62,
+    // Mother 2 sanctuary feel: round 50% lead, slow arp, gentle vibrato
+    chipLeadDuty: 0.50, chipArpDuty: 0.25, chipVibDepth: 4, chipVibRate: 4.8, chipArpHz: 60,
+    vol: { k:0.38, s:0.26, h:0.14, bass:0.62, piano:0.54, melo:0.46, pad:0.06 },
   },
   {
     id: 'walk', name: '散歩', icon: '🚶',
     sub: '街を歩きながら',
     bpmRange: [92,100], drumPat: 'fourFloor', barsPerChord: 4,
-    pianoSteps: [0, 8], pianoNotes: 3,
-    pianoArpDensity: 0.85,
-    melodChance: 0.74,
-    // Indie-electronic bounce: mid-bright cutoff, medium detune, punchy lead
-    padCutoff: 2200, padDetune: 9, leadCutoff: 3400,
-    vol: { k:0.78, s:0.62, h:0.28, bass:0.72, piano:0.56, melo:0.48, pad:0.04 },
+    pianoSteps: [0, 4, 8, 12], pianoNotes: 3,
+    pianoArpDensity: 0.88,
+    melodChance: 0.76,
+    // Upbeat NES field/overworld: bright 25% lead, punchy arp, fast vib
+    chipLeadDuty: 0.25, chipArpDuty: 0.125, chipVibDepth: 5, chipVibRate: 6.0, chipArpHz: 90,
+    vol: { k:0.78, s:0.62, h:0.30, bass:0.72, piano:0.56, melo:0.50, pad:0.03 },
   },
   {
     id: 'focus', name: '集中', icon: '✨',
     sub: '作業に没頭する時間',
     bpmRange: [80,88], drumPat: 'steadyHat', barsPerChord: 4,
-    pianoSteps: [0, 8], pianoNotes: 4,
-    pianoArpDensity: 0.62,
-    melodChance: 0.54,
-    // Minimal ambient-techno: clean mid cutoff, tight detune, smooth lead
-    padCutoff: 1100, padDetune: 5, leadCutoff: 1800,
-    vol: { k:0.64, s:0.46, h:0.22, bass:0.68, piano:0.54, melo:0.44, pad:0.06 },
+    pianoSteps: [0, 8], pianoNotes: 3,
+    pianoArpDensity: 0.60,
+    melodChance: 0.56,
+    // Hypnotic dungeon/underground: round 50% lead, fast 12.5% arp, minimal vib
+    chipLeadDuty: 0.50, chipArpDuty: 0.125, chipVibDepth: 3, chipVibRate: 5.5, chipArpHz: 100,
+    vol: { k:0.62, s:0.44, h:0.22, bass:0.66, piano:0.54, melo:0.44, pad:0.05 },
   },
   {
     id: 'meditation', name: '瞑想', icon: '🌸',
     sub: '静かに、ただ存在する',
     bpmRange: [56,64], drumPat: 'ambient', barsPerChord: 8,
-    pianoSteps: [0], pianoNotes: 4,
-    pianoArpDensity: 0.38,
-    melodChance: 0.38,
-    // Dark ambient drone: very low cutoff, widest detune → thick lush fog
-    padCutoff: 560, padDetune: 18, leadCutoff: 850,
-    vol: { k:0.0, s:0.0, h:0.0, bass:0.54, piano:0.58, melo:0.44, pad:0.10 },
+    pianoSteps: [0], pianoNotes: 3,
+    pianoArpDensity: 0.35,
+    melodChance: 0.36,
+    // SNES ambient (Your Sanctuary): pure 50% on both, very slow arp, whisper vib
+    chipLeadDuty: 0.50, chipArpDuty: 0.50, chipVibDepth: 3, chipVibRate: 4.2, chipArpHz: 50,
+    vol: { k:0.0, s:0.0, h:0.0, bass:0.52, piano:0.54, melo:0.44, pad:0.08 },
   },
   {
     id: 'night', name: '夜', icon: '🌙',
     sub: '夜、窓の外を眺めながら',
     bpmRange: [64,72], drumPat: 'minimal', barsPerChord: 8,
-    pianoSteps: [0, 8], pianoNotes: 4,
-    pianoArpDensity: 0.60,
-    melodChance: 0.62,
-    // Downtempo atmospheric: dark cutoff, moderate detune, ethereal lead
-    padCutoff: 720, padDetune: 13, leadCutoff: 1600,
-    vol: { k:0.36, s:0.24, h:0.12, bass:0.62, piano:0.56, melo:0.44, pad:0.08 },
+    pianoSteps: [0, 8], pianoNotes: 3,
+    pianoArpDensity: 0.58,
+    melodChance: 0.60,
+    // Quiet NES night town: 25% nasal lead (distinctive), slow 50% arp
+    chipLeadDuty: 0.25, chipArpDuty: 0.50, chipVibDepth: 5, chipVibRate: 5.0, chipArpHz: 65,
+    vol: { k:0.34, s:0.22, h:0.12, bass:0.60, piano:0.52, melo:0.44, pad:0.06 },
   },
   {
-    id: 'edm', name: 'EDM', icon: '⚡',
-    sub: 'テンションを上げる電子の波動',
-    bpmRange: [126,132], drumPat: 'edmFour', barsPerChord: 4,
-    pianoSteps: [], pianoNotes: 0,   // EDM uses chord stabs instead
-    guitarDensity: 0,               // no acoustic guitar
-    melodChance: 0,                  // EDM handles melody via arp
-    // vol.clap / vol.stab / vol.arp are EDM-specific
-    vol: { k:0.92, s:0, h:0.24, bass:0.68, piano:0, guitar:0, melo:0, pad:0,
-           clap:0.62, stab:0.44, arp:0.36 },
+    // ファミコン・バトル曲: テンションを上げる高速NESバトルBGM
+    // 参考: Mother 2 のボス戦曲 / FC ロックマン / コントラのボス戦
+    id: 'battle', name: 'バトル', icon: '⚔️',
+    sub: 'テンションを一気に上げる',
+    bpmRange: [148,160], drumPat: 'fourFloor', barsPerChord: 2,
+    pianoSteps: [0, 4, 8, 12], pianoNotes: 3,
+    pianoArpDensity: 0.95,
+    melodChance: 0.90,
+    // Ultra-aggressive: thin 12.5% duty on both channels, very fast arp
+    chipLeadDuty: 0.125, chipArpDuty: 0.25, chipVibDepth: 3, chipVibRate: 7.0, chipArpHz: 130,
+    vol: { k:0.90, s:0.76, h:0.34, bass:0.78, piano:0.66, melo:0.58, pad:0 },
   },
 ];
 
@@ -6197,12 +6255,7 @@ class NagiMusic {
     this._sessionPianoArp  = PIANO_ARP_STYLES[Math.floor(Math.random() * PIANO_ARP_STYLES.length)];
     this._lastMeloFreq     = null;
 
-    // EDM-specific session randomisation
-    if (track.id === 'edm') {
-      this._sessionBassPattern = EDM_BASS_PATTERNS[Math.floor(Math.random() * EDM_BASS_PATTERNS.length)];
-      this._sessionStabSteps   = EDM_STAB_STEPS[Math.floor(Math.random() * EDM_STAB_STEPS.length)];
-      this._sessionArpPat      = EDM_ARP_PATTERNS[Math.floor(Math.random() * EDM_ARP_PATTERNS.length)];
-    }
+    // (EDM-specific session state removed — battle track uses standard chiptune scheduler)
   }
 
   // ── Play / Stop public API ──────────────────────────────────────────────────
@@ -6354,9 +6407,9 @@ class NagiMusic {
       });
     });
 
-    bassFreqs.forEach(f   => this._bassBufs.set(f,   computePickBass(this.ac, f)));
-    guitarFreqs.forEach(f => this._guitarBufs.set(f, computePickGuitar(this.ac, f)));
-    pianoFreqs.forEach(f  => this._pianoBufs.set(f,  computePianoChordNote(this.ac, f)));
+    // Bass: preload as NES triangle wave (no more Karplus-Strong pluck)
+    bassFreqs.forEach(f => this._bassBufs.set(f, computeChipTriangle(this.ac, f, 1.8)));
+    // Piano/guitar caches no longer pre-populated (chip notes computed in real time)
   }
 
   _getBassBuffer(freq) {
@@ -6366,7 +6419,8 @@ class NagiMusic {
       if (d < bestDiff) { bestDiff = d; best = buf; }
     }
     if (bestDiff < 4) return best;
-    const buf = computePickBass(this.ac, freq);
+    // Compute triangle note fresh if no cached match
+    const buf = computeChipTriangle(this.ac, freq, 1.8);
     this._bassBufs.set(freq, buf);
     return buf;
   }
@@ -6527,7 +6581,7 @@ class NagiMusic {
 
   _startPad() {
     const track = MUSIC_TRACKS[this.trackIdx];
-    if (track.id === 'edm') return;    // EDM uses synth sounds, no sustain pad
+    if (track.vol.pad === 0) return;    // tracks with pad:0 skip sustain drone
     const prog  = this._sessionProg || PROG_VARIANTS[track.id][0];
     const chord = MCHORDS[prog[0]];
     // Two sine oscillators: bottom two pad tones, very soft
@@ -6589,10 +6643,7 @@ class NagiMusic {
     const track = MUSIC_TRACKS[this.trackIdx];
     const si    = this._step;
 
-    // EDM has its own scheduler — separate synthesis, sidechain, etc.
-    if (track.id === 'edm') { this._scheduleEDMStep(when, track, si); return; }
-
-    const drum     = DRUM_PATTERNS[track.drumPat];
+    const drum     = DRUM_PATTERNS[track.drumPat] || DRUM_PATTERNS['fourFloor'];
     const prog     = this._sessionProg;
     const cycleLen = track.barsPerChord * prog.length;
     const barInCy  = this._bar % cycleLen;
@@ -6621,43 +6672,48 @@ class NagiMusic {
       this._updatePad(chord, track.vol.pad, when);
     }
 
-    // ── Synth pad arpeggio (8th-note grid) ───────────────────────────────────
-    // Detuned-saw pad through track-specific LP filter.  Each track has its own
-    // padCutoff + padDetune so the arpeggio texture sounds completely different:
-    // bright future-bass (morning) vs dark-ambient waterfall (meditation).
+    // ── Chip arpeggio channel (NES ch2 style) ────────────────────────────────
+    // Plays a rapid arpeggio through chord tones on a single pulse channel.
+    // This is the NES trick for implying harmony: the arpHz cycles through
+    // chord notes fast enough that the ear hears a "chord" from one oscillator.
     if (si % 2 === 0 && this._sessionPianoArp && Math.random() < (track.pianoArpDensity || 0)) {
       const arpStep = (si / 2) % this._sessionPianoArp.length;
       const noteIdx = this._sessionPianoArp[arpStep];
-      const freq    = chord.pads[Math.min(noteIdx, chord.pads.length - 1)];
-      const jitter  = (Math.random() - 0.5) * 0.008;
-      const buf     = computeSynthPadNote(this.ac, freq, 1.1,
-                        track.padCutoff || 1400, track.padDetune || 10);
+      // Build 3-note chord slice centered on the arp step note
+      const base    = Math.min(noteIdx, chord.pads.length - 1);
+      const arpFreqs = chord.pads.slice(0, Math.min(3, chord.pads.length));
+      const jitter  = (Math.random() - 0.5) * 0.006;
+      const buf     = computeChipArp(this.ac, arpFreqs, 1.0,
+                        track.chipArpDuty || 0.25, track.chipArpHz || 80);
       this._pb(buf, Math.max(when, when + jitter),
-               track.vol.piano * (0.50 + Math.random() * 0.20));
+               track.vol.piano * (0.48 + Math.random() * 0.18));
     }
 
-    // ── Synth pad chord comping (pianoSteps) ─────────────────────────────────
-    // Full voicing staggered 16 ms per note for a natural chord roll.
-    // Same pad timbre as the arp but at full duration (2.4 s) for harmonic body.
+    // ── Chip chord hit (accent on pianoSteps) ────────────────────────────────
+    // On the beat anchors, hit all 3 chord tones as simultaneous pulse notes.
+    // NES would do this by briefly switching all channels — here we have spare
+    // polyphony, so we can play them truly simultaneously (SNES-style richness).
     if (track.pianoSteps.includes(si)) {
       const voicing = chord.pads.slice(0, track.pianoNotes);
       voicing.forEach((freq, i) => {
-        const buf = computeSynthPadNote(this.ac, freq, 2.4,
-                      track.padCutoff || 1400, track.padDetune || 10);
-        this._pb(buf, when + i * 0.016,
-                 track.vol.piano * (i === 0 ? 1.0 : 0.82));
+        // Alternate duty: root and 5th use different duty for spectral width
+        const d   = (i === 0) ? (track.chipArpDuty || 0.25) : 0.50;
+        const buf = computeChipPulse(this.ac, freq, 2.0, d,
+                      track.chipVibRate || 5.5, (track.chipVibDepth || 5) * 0.4);
+        this._pb(buf, when + i * 0.012,
+                 track.vol.piano * (i === 0 ? 1.0 : 0.72));
       });
     }
 
-    // ── Synth lead melody (quarter-note grid) ────────────────────────────────
-    // Square wave + decaying filter envelope: punchy at attack, settles to the
-    // track's leadCutoff.  melodChance is high (0.38–0.80) so melody is
-    // continuous; each track's leadCutoff defines its personality
-    // (4000=cutting morning vs 850=whisper-dark meditation).
+    // ── Chip lead melody (NES ch1 style, quarter-note grid) ──────────────────
+    // Single pulse note with vibrato — the melody you hum after playing the game.
+    // melodChance controls density; each track's duty + vib makes it unique.
     if (si % 4 === 0 && Math.random() < track.melodChance) {
       const freq = this._nextMeloNote(chord);
-      const buf  = computeSynthLeadNote(this.ac, freq, 2.6,
-                     track.leadCutoff || 2400);
+      const buf  = computeChipPulse(this.ac, freq, 2.4,
+                     track.chipLeadDuty  || 0.25,
+                     track.chipVibRate   || 5.5,
+                     track.chipVibDepth  || 5);
       this._pb(buf, when, track.vol.melo);
     }
   }
@@ -6742,7 +6798,7 @@ class NagiMusic {
       const btn = document.createElement('button');
       btn.className = 'ms-track-tab'
         + (i === this.trackIdx ? ' active' : '')
-        + (t.id === 'edm' ? ' edm-tab' : '');
+        + (t.id === 'battle' ? ' edm-tab' : '');
       btn.setAttribute('aria-selected', i === this.trackIdx ? 'true' : 'false');
       btn.innerHTML =
         `<span class="ms-ttab-icon">${t.icon}</span>` +
