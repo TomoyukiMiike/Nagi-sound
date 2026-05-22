@@ -5733,19 +5733,31 @@ const GUITAR_ARP_STYLES = [
   [0,2,0,3,0,1,0,3],  // pedal bass
 ];
 
+// ── Coldplay-style piano arpeggio patterns (indices into chord.pads) ───────────
+// Each value is an index into the current chord's pads array:
+//   0=lowest(G3/F3/A3), 1=second, 2=third, 3=highest
+// Patterns are 8 steps long, played on 8th-note grid (si % 2 === 0)
+const PIANO_ARP_STYLES = [
+  [0,2,1,3, 0,2,1,3],   // "Clocks"   — bass note + alternating mid/high
+  [3,2,1,0, 3,2,1,0],   // "The Scientist" — cascading waterfall down
+  [0,1,2,3, 2,1,0,1],   // "Yellow"  — ascending then arc back
+  [0,2,0,3, 0,2,0,3],   // pedal bass + upper voices
+  [1,3,1,2, 0,3,0,2],   // "Fix You" — inner voice lead with bass drops
+];
+
 // 6 situation tracks — tabs match the healing mode categories
 const MUSIC_TRACKS = [
   {
     id: 'morning', name: '朝', icon: '🌅',
     sub: 'コーヒーと朝の光の中で',
     bpmRange: [84,90], drumPat: 'boomBap', barsPerChord: 4,
-    pianoSteps: [0, 8],        // on the beat — clear, bright morning chord
-    pianoNotes: 4,             // full voicing
-    guitarDensity: 0.40,       // gentle arpeggio accent
-    melodChance: 0.32,
-    //  piano is the main melodic colour; guitar adds fingerpicked texture;
-    //  drums and bass are prominent but not overwhelming
-    vol: { k:0.74, s:0.56, h:0.26, bass:0.72, piano:0.64, guitar:0.18, melo:0.26, pad:0.05 },
+    pianoSteps: [0, 8],         // anchor chord on beats 1 & 3
+    pianoNotes: 4,
+    pianoArpDensity: 0.82,      // flowing Coldplay arpeggio, very frequent
+    guitarDensity: 0.08,        // ghost accent — barely audible shimmer
+    melodChance: 0.74,          // piano melody is the lead voice
+    // piano & melo dominate; guitar is a whisper; drums & bass stay prominent
+    vol: { k:0.74, s:0.56, h:0.26, bass:0.72, piano:0.58, guitar:0.07, melo:0.48, pad:0.05 },
   },
   {
     id: 'relax', name: 'リラックス', icon: '🌿',
@@ -5753,19 +5765,21 @@ const MUSIC_TRACKS = [
     bpmRange: [68,76], drumPat: 'minimal', barsPerChord: 8,
     pianoSteps: [0, 8],
     pianoNotes: 4,
-    guitarDensity: 0.28,       // sparse, very gentle
-    melodChance: 0.22,
-    vol: { k:0.42, s:0.30, h:0.15, bass:0.66, piano:0.68, guitar:0.16, melo:0.22, pad:0.08 },
+    pianoArpDensity: 0.72,      // "The Scientist" — gentle rolling arpeggio
+    guitarDensity: 0.07,        // barely there
+    melodChance: 0.68,
+    vol: { k:0.42, s:0.30, h:0.15, bass:0.66, piano:0.56, guitar:0.06, melo:0.46, pad:0.08 },
   },
   {
     id: 'walk', name: '散歩', icon: '🚶',
     sub: '街を歩きながら',
     bpmRange: [92,100], drumPat: 'fourFloor', barsPerChord: 4,
-    pianoSteps: [2, 6, 10, 14], // off-beat rhythmic piano stabs
+    pianoSteps: [0, 8],         // beat-anchored comping (simplified from off-beat)
     pianoNotes: 3,
-    guitarDensity: 0.50,        // moderate — adds movement
-    melodChance: 0.38,
-    vol: { k:0.78, s:0.62, h:0.28, bass:0.72, piano:0.62, guitar:0.20, melo:0.26, pad:0.04 },
+    pianoArpDensity: 0.85,      // energetic arpeggio — rhythmic forward motion
+    guitarDensity: 0.10,        // light accent during walk feel
+    melodChance: 0.76,
+    vol: { k:0.78, s:0.62, h:0.28, bass:0.72, piano:0.56, guitar:0.08, melo:0.46, pad:0.04 },
   },
   {
     id: 'focus', name: '集中', icon: '✨',
@@ -5773,19 +5787,21 @@ const MUSIC_TRACKS = [
     bpmRange: [80,88], drumPat: 'steadyHat', barsPerChord: 4,
     pianoSteps: [0, 8],
     pianoNotes: 4,
-    guitarDensity: 0.22,        // very sparse — non-distracting
-    melodChance: 0.14,
-    vol: { k:0.64, s:0.46, h:0.22, bass:0.70, piano:0.64, guitar:0.14, melo:0.18, pad:0.06 },
+    pianoArpDensity: 0.65,      // steady but not intrusive; focus-friendly
+    guitarDensity: 0.06,        // near-silent guitar
+    melodChance: 0.58,
+    vol: { k:0.64, s:0.46, h:0.22, bass:0.70, piano:0.54, guitar:0.06, melo:0.42, pad:0.06 },
   },
   {
     id: 'meditation', name: '瞑想', icon: '🌸',
     sub: '静かに、ただ存在する',
     bpmRange: [56,64], drumPat: 'ambient', barsPerChord: 8,
-    pianoSteps: [0],            // single chord per bar, long ring
+    pianoSteps: [0],            // single chord drop per bar — spacious
     pianoNotes: 4,
-    guitarDensity: 0.14,        // barely there
-    melodChance: 0.09,
-    vol: { k:0.0, s:0.0, h:0.0, bass:0.56, piano:0.70, guitar:0.12, melo:0.18, pad:0.10 },
+    pianoArpDensity: 0.40,      // sparse, contemplative; notes emerge from silence
+    guitarDensity: 0.05,        // essentially inaudible — atmosphere only
+    melodChance: 0.40,
+    vol: { k:0.0, s:0.0, h:0.0, bass:0.56, piano:0.58, guitar:0.05, melo:0.44, pad:0.10 },
   },
   {
     id: 'night', name: '夜', icon: '🌙',
@@ -5793,9 +5809,10 @@ const MUSIC_TRACKS = [
     bpmRange: [64,72], drumPat: 'minimal', barsPerChord: 8,
     pianoSteps: [0, 8],
     pianoNotes: 4,
-    guitarDensity: 0.20,        // soft, infrequent
-    melodChance: 0.18,
-    vol: { k:0.36, s:0.24, h:0.12, bass:0.64, piano:0.68, guitar:0.15, melo:0.20, pad:0.08 },
+    pianoArpDensity: 0.62,      // dreamy, unhurried — "Fix You" atmosphere
+    guitarDensity: 0.06,        // phantom guitar in the background
+    melodChance: 0.65,
+    vol: { k:0.36, s:0.24, h:0.12, bass:0.64, piano:0.56, guitar:0.06, melo:0.44, pad:0.08 },
   },
   {
     id: 'edm', name: 'EDM', icon: '⚡',
@@ -5843,6 +5860,7 @@ class NagiMusic {
     this._sessionProg      = null; // chord progression for this session
     this._sessionBpm       = 80;
     this._sessionGuitarArp = null; // fingerpicking pattern index array
+    this._sessionPianoArp  = null; // Coldplay-style piano arpeggio pattern
 
     // EDM-specific session state
     this._sessionBassPattern = null;
@@ -5969,6 +5987,7 @@ class NagiMusic {
     const [lo, hi]         = track.bpmRange;
     this._sessionBpm       = lo + Math.floor(Math.random() * (hi - lo + 1));
     this._sessionGuitarArp = GUITAR_ARP_STYLES[Math.floor(Math.random() * GUITAR_ARP_STYLES.length)];
+    this._sessionPianoArp  = PIANO_ARP_STYLES[Math.floor(Math.random() * PIANO_ARP_STYLES.length)];
     this._lastMeloFreq     = null;
 
     // EDM-specific session randomisation
@@ -6395,42 +6414,60 @@ class NagiMusic {
       this._updatePad(chord, track.vol.pad, when);
     }
 
-    // ── Acoustic guitar fingerpicking (Karplus-Strong) ────────────────────────
-    // Fires every two 16th-notes (8th-note grid), with humanising jitter
-    if (si % 2 === 0) {
+    // ── Acoustic guitar — accent only (Coldplay: barely audible shimmer) ────
+    // Fires on 8th-note grid at very low density so guitar is a ghost texture,
+    // not a competing voice. Guitar vol is set very low in each track.
+    if (si % 2 === 0 && track.guitarDensity > 0) {
       const arpStep = (si / 2) % this._sessionGuitarArp.length;
       const noteIdx = this._sessionGuitarArp[arpStep];
       const freq    = chord.pads[Math.min(noteIdx, chord.pads.length - 1)];
       if (Math.random() < track.guitarDensity) {
-        const jitter = (Math.random() - 0.5) * 0.012;
+        const jitter = (Math.random() - 0.5) * 0.015;
         this._pb(
           this._getGuitarBuffer(freq),
           Math.max(when, when + jitter),
-          track.vol.guitar * (0.70 + Math.random() * 0.30)
+          track.vol.guitar * (0.60 + Math.random() * 0.40)
         );
       }
     }
 
-    // ── Piano chord comping (additive synthesis) — main sound ────────────────
-    // Full voicing from lowest pad note up; staggered 18 ms for a natural roll.
-    // Bass register (55–132 Hz) is handled by the separate bass instrument,
-    // so the lowest piano pad (G3/A3/F3 ≈ 176–220 Hz) never clashes.
+    // ── Piano arpeggio — Coldplay signature texture (8th-note grid) ──────────
+    // Flowing arpeggio through chord tones: "Clocks", "The Scientist" feel.
+    // Uses the cached chord-note buffer (2.4 s sustain, right resonance for arp).
+    // Fires independently of chord comping for continuous movement.
+    if (si % 2 === 0 && this._sessionPianoArp && Math.random() < (track.pianoArpDensity || 0)) {
+      const arpStep = (si / 2) % this._sessionPianoArp.length;
+      const noteIdx = this._sessionPianoArp[arpStep];
+      const freq    = chord.pads[Math.min(noteIdx, chord.pads.length - 1)];
+      const jitter  = (Math.random() - 0.5) * 0.008;
+      this._pb(
+        this._getPianoBuffer(freq),
+        Math.max(when, when + jitter),
+        track.vol.piano * (0.52 + Math.random() * 0.22)   // slightly softer than comp chord
+      );
+    }
+
+    // ── Piano chord comping — root-position anchor on pianoSteps ────────────
+    // Staggered 18 ms roll for natural feel.  Bass register handled separately.
     if (track.pianoSteps.includes(si)) {
       const voicing = chord.pads.slice(0, track.pianoNotes);
       voicing.forEach((freq, i) => {
         this._pb(
           this._getPianoBuffer(freq),
           when + i * 0.018,
-          track.vol.piano * (i === 0 ? 1.0 : 0.80)   // inner voices slightly softer
+          track.vol.piano * (i === 0 ? 1.0 : 0.80)
         );
       });
     }
 
-    // ── Melody (piano, sparse, stepwise random-walk) ─────────────────────────
+    // ── Piano melody — main lead voice (Coldplay: the tune you sing along to) ─
+    // Full-quality 5.5-s computePianoBuffer, prominent volume, quarter-note grid.
+    // melodChance is now high (0.55–0.82) so melody drives continuously.
     if (si % 4 === 0 && Math.random() < track.melodChance) {
       const freq = this._nextMeloNote(chord);
-      const buf  = computePianoBuffer(this.ac, freq, track.vol.melo * 0.55, 1.6);
-      this._pb(buf, when, 1.0);
+      // velocity=0.78 → rich attack + shimmer; duration=2.8 s → notes ring out
+      const buf  = computePianoBuffer(this.ac, freq, 0.78, 2.8);
+      this._pb(buf, when, track.vol.melo);   // full melo volume — no penalty
     }
   }
 
